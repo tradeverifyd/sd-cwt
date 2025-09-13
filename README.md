@@ -1,4 +1,4 @@
-# SD-CWT: Selective Disclosure CWT Implementation
+# SD-CWT: Selective Disclosure CBOR Web Token
 
 This is an experimental implementation of [draft-ietf-spice-sd-cwt](https://github.com/ietf-wg-spice/draft-ietf-spice-sd-cwt).
 
@@ -155,7 +155,8 @@ sd-cwt/
 - **Selective Disclosure**: Choose which claims to reveal during presentation
 - **CBOR/COSE Support**: Full support for CBOR encoding and COSE signatures
 - **COSE Key Thumbprints**: RFC 9679 compliant key thumbprint computation
-- **CBOR Validation**: CBOR diagnostic notation and CDDL schema validation
+- **CBOR Extended Diagnostic Notation (EDN)**: Parse and generate human-readable CBOR representations
+- **CDDL Schema Validation**: Validate structures against CDDL schemas from specifications
 - **Salted Hashing**: Privacy-preserving claim commitments using salted hashes
 - **Holder Binding**: Optional holder binding for enhanced security
 
