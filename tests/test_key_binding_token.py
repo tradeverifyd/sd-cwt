@@ -9,8 +9,10 @@ from sd_cwt import (
     PresentationVerifier,
     cbor_utils,
     cose_key_generate,
+    cose_key_kid_resolver,
     get_presentation_verifier,
 )
+from sd_cwt.thumbprint import CoseKeyThumbprint
 from sd_cwt.cose_sign1 import cose_sign1_sign
 from sd_cwt.holder_binding import create_cnf_claim, create_sd_kbt, validate_sd_kbt_structure
 
@@ -78,10 +80,14 @@ class TestKeyBindingToken:
             8: cnf_claim                      # cnf - holder key confirmation
         }
 
+        # Compute thumbprint to use as kid
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+
         # Sign SD-CWT (no selective disclosure, just basic CWT with cnf)
         protected_header = {
             1: -7,  # ES256
-            16: "application/sd-cwt"  # typ
+            16: "application/sd-cwt",  # typ
+            4: issuer_thumbprint  # kid for key resolution
         }
 
         payload_cbor = cbor_utils.encode(basic_claims)
@@ -98,9 +104,12 @@ class TestKeyBindingToken:
         sd_cwt_data = self._create_test_sd_cwt()
         sd_cwt, issuer_key_cbor, holder_key_cbor = sd_cwt_data
 
-        # Create credential verifier with issuer key
+        # Create credential verifier with key resolver
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        credential_verifier = CredentialVerifier(issuer_key_dict)
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+        kid_key_pairs = [(issuer_thumbprint, issuer_key_cbor)]
+        key_resolver = cose_key_kid_resolver(kid_key_pairs)
+        credential_verifier = CredentialVerifier(key_resolver)
 
         # Verify SD-CWT signature
         is_valid, payload = credential_verifier.verify(sd_cwt)
@@ -139,12 +148,15 @@ class TestKeyBindingToken:
         cnonce = b"client-nonce-12345"
 
         # Create SD-KBT
+        holder_key_dict = cbor_utils.decode(holder_key_cbor)
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience=verifier_audience,
             issued_at=issued_at,
-            cnonce=cnonce
+            cnonce=cnonce,
+            key_id=holder_thumbprint
         )
 
         # Verify SD-KBT structure
@@ -205,9 +217,12 @@ class TestKeyBindingToken:
         # Create a valid KBT
         sd_kbt, holder_key_cbor = self.test_create_key_binding_token()
 
-        # Create presentation verifier with holder key
+        # Create presentation verifier with holder key resolver
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
-        presentation_verifier = PresentationVerifier(holder_key_dict)
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
+        kid_key_pairs = [(holder_thumbprint, holder_key_cbor)]
+        holder_resolver = cose_key_kid_resolver(kid_key_pairs)
+        presentation_verifier = PresentationVerifier(holder_resolver)
 
         # Verify KBT signature with audience validation
         expected_audience = "https://verifier.example/api"
@@ -242,7 +257,9 @@ class TestKeyBindingToken:
             8: cnf_claim  # Holder key confirmation
         }
 
-        protected_header = {1: -7, 16: "application/sd-cwt"}
+        # Compute thumbprint for key resolution
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+        protected_header = {1: -7, 16: "application/sd-cwt", 4: issuer_thumbprint}
         payload_cbor = cbor_utils.encode(claims)
         sd_cwt = cose_sign1_sign(payload_cbor, issuer_signer,
                                  protected_header=protected_header)
@@ -250,12 +267,14 @@ class TestKeyBindingToken:
         # Step 3: Create Key Binding Token (KBT)
         holder_signer = PresentationSigner(holder_key_dict)
 
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience="https://verifier.example/api",
             issued_at=int(time.time()),
-            cnonce=b"unique-presentation-nonce"
+            cnonce=b"unique-presentation-nonce",
+            key_id=holder_thumbprint
         )
 
         # Step 4: Validate KBT structure
@@ -264,7 +283,10 @@ class TestKeyBindingToken:
 
         # Step 5: Verify KBT signature with audience validation
         expected_audience = "https://verifier.example/api"
-        presentation_verifier = PresentationVerifier(holder_key_dict)
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
+        kid_key_pairs = [(holder_thumbprint, holder_key_cbor)]
+        holder_resolver = cose_key_kid_resolver(kid_key_pairs)
+        presentation_verifier = PresentationVerifier(holder_resolver)
         is_valid, verified_payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
         assert is_valid and verified_payload is not None
         assert verified_payload[3] == expected_audience
@@ -279,11 +301,13 @@ class TestKeyBindingToken:
         holder_signer = PresentationSigner(holder_key_dict)
 
         # Create KBT without cnonce
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience="https://verifier.example",
-            issued_at=int(time.time())
+            issued_at=int(time.time()),
+            key_id=holder_thumbprint
             # No cnonce parameter
         )
 
@@ -317,16 +341,20 @@ class TestKeyBindingToken:
             8: cnf_claim  # Thumbprint-based confirmation
         }
 
-        protected_header = {1: -7, 16: "application/sd-cwt"}
+        # Compute thumbprint for key resolution
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+        protected_header = {1: -7, 16: "application/sd-cwt", 4: issuer_thumbprint}
         payload_cbor = cbor_utils.encode(claims)
         sd_cwt = cose_sign1_sign(payload_cbor, issuer_signer, protected_header=protected_header)
 
         # Create and verify KBT
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience="https://verifier.example",
-            issued_at=int(time.time())
+            issued_at=int(time.time()),
+            key_id=holder_thumbprint
         )
 
         # Verify KBT structure
@@ -335,7 +363,10 @@ class TestKeyBindingToken:
 
         # Verify KBT signature with holder key and audience validation
         expected_audience = "https://verifier.example"
-        presentation_verifier = PresentationVerifier(holder_key_dict)
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
+        kid_key_pairs = [(holder_thumbprint, holder_key_cbor)]
+        holder_resolver = cose_key_kid_resolver(kid_key_pairs)
+        presentation_verifier = PresentationVerifier(holder_resolver)
         is_valid, payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
         assert is_valid and payload is not None, "KBT signature should verify"
 
@@ -347,13 +378,17 @@ class TestKeyBindingToken:
 
         # Step 2: Create credential verifier and verify SD-CWT
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        credential_verifier = CredentialVerifier(issuer_key_dict)
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+        kid_key_pairs = [(issuer_thumbprint, issuer_key_cbor)]
+        issuer_resolver = cose_key_kid_resolver(kid_key_pairs)
+        credential_verifier = CredentialVerifier(issuer_resolver)
 
         is_valid, payload = credential_verifier.verify(sd_cwt)
         assert is_valid, "SD-CWT signature should verify"
         assert payload is not None, "SD-CWT payload should not be None"
 
         # Step 3: Extract presentation verifier using utility function
+        # For embedded keys, no holder_key_resolver needed
         presentation_verifier = get_presentation_verifier(sd_cwt, credential_verifier)
         assert presentation_verifier is not None, "Should extract presentation verifier"
 
@@ -362,12 +397,14 @@ class TestKeyBindingToken:
         holder_signer = PresentationSigner(holder_key_dict)
 
         expected_audience = "https://verifier.example/presentation"
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience=expected_audience,
             issued_at=int(time.time()),
-            cnonce=b"verification-chain-nonce"
+            cnonce=b"verification-chain-nonce",
+            key_id=holder_thumbprint
         )
 
         # Step 5: Verify holder-signed KBT with audience validation
@@ -393,7 +430,12 @@ class TestKeyBindingToken:
 
         # Create presentation verifier
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        credential_verifier = CredentialVerifier(issuer_key_dict)
+        issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
+        kid_key_pairs = [(issuer_thumbprint, issuer_key_cbor)]
+        issuer_resolver = cose_key_kid_resolver(kid_key_pairs)
+        credential_verifier = CredentialVerifier(issuer_resolver)
+
+        # For embedded keys, no holder_key_resolver needed
         presentation_verifier = get_presentation_verifier(sd_cwt, credential_verifier)
         assert presentation_verifier is not None
 
@@ -402,12 +444,14 @@ class TestKeyBindingToken:
         holder_signer = PresentationSigner(holder_key_dict)
 
         correct_audience = "https://verifier.example/correct"
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key_dict, "sha256")
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
             holder_signer=holder_signer,
             audience=correct_audience,
             issued_at=int(time.time()),
-            cnonce=b"audience-test-nonce"
+            cnonce=b"audience-test-nonce",
+            key_id=holder_thumbprint
         )
 
         # Test 1: Verification should succeed with correct audience

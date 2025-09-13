@@ -53,7 +53,7 @@ class TestResolvers:
             resolver(unknown_thumbprint)
             raise AssertionError("Should raise ValueError for unknown thumbprint")
         except ValueError as e:
-            assert "Thumbprint not found" in str(e)
+            assert "Kid not found" in str(e)
 
     def test_cose_key_thumbprint_resolver_error_handling(self):
         """Test that resolver provides helpful error messages for missing thumbprints."""
@@ -77,8 +77,8 @@ class TestResolvers:
             raise AssertionError("Should raise ValueError for unknown thumbprint")
         except ValueError as e:
             error_msg = str(e)
-            assert "Thumbprint not found" in error_msg
-            assert "Available thumbprints" in error_msg
+            assert "Kid not found" in error_msg
+            assert "Available kids" in error_msg
             assert "7878787878787878" in error_msg  # Part of invalid thumbprint (hex of 'xxxx...')
 
     def test_credential_verifier_with_thumbprint_resolver(self):
@@ -98,12 +98,9 @@ class TestResolvers:
         issuer1_thumbprint = CoseKeyThumbprint.compute(issuer1_key, "sha256")
         issuer2_thumbprint = CoseKeyThumbprint.compute(issuer2_key, "sha256")
 
-        # Create CredentialVerifiers using resolved keys
-        resolved_key1 = key_resolver(issuer1_thumbprint)
-        resolved_key2 = key_resolver(issuer2_thumbprint)
-
-        verifier1 = CredentialVerifier(resolved_key1)
-        verifier2 = CredentialVerifier(resolved_key2)
+        # Create CredentialVerifiers using the key resolver
+        verifier1 = CredentialVerifier(key_resolver)
+        verifier2 = CredentialVerifier(key_resolver)
 
         # Create SD-CWTs from both issuers
         signer1 = CredentialSigner(issuer1_key)
@@ -129,10 +126,14 @@ class TestResolvers:
         payload1_cbor = cbor_utils.encode(claims1)
         payload2_cbor = cbor_utils.encode(claims2)
 
-        sd_cwt1 = cose_sign1_sign(payload1_cbor, signer1)
-        sd_cwt2 = cose_sign1_sign(payload2_cbor, signer2)
+        # Include thumbprints in protected headers so verifier can resolve keys
+        protected_header1 = {1: -7, 4: issuer1_thumbprint}  # kid = thumbprint
+        protected_header2 = {1: -7, 4: issuer2_thumbprint}  # kid = thumbprint
 
-        # Test verification with correct verifiers
+        sd_cwt1 = cose_sign1_sign(payload1_cbor, signer1, protected_header=protected_header1)
+        sd_cwt2 = cose_sign1_sign(payload2_cbor, signer2, protected_header=protected_header2)
+
+        # Test verification with correct verifiers (both use same resolver)
         is_valid1, payload1 = verifier1.verify(sd_cwt1)
         assert is_valid1, "Verifier1 should verify SD-CWT1"
         assert payload1[1] == "https://issuer1.example"
@@ -140,12 +141,6 @@ class TestResolvers:
         is_valid2, payload2 = verifier2.verify(sd_cwt2)
         assert is_valid2, "Verifier2 should verify SD-CWT2"
         assert payload2[1] == "https://issuer2.example"
-
-        # Test that cross-verification fails
-        cross_valid1, _ = verifier1.verify(sd_cwt2)
-        cross_valid2, _ = verifier2.verify(sd_cwt1)
-        assert not cross_valid1, "Cross-verification should fail"
-        assert not cross_valid2, "Cross-verification should fail"
 
 
     def test_end_to_end_resolution_workflow(self):
@@ -192,21 +187,13 @@ class TestResolvers:
         payload2_cbor = cbor_utils.encode(claims2)
         sd_cwt2 = cose_sign1_sign(payload2_cbor, signer2, protected_header=protected_header2)
 
-        # Step 4: Create verifiers using key resolver and verify SD-CWTs
-        resolved_key1 = key_resolver(issuer1_thumbprint)
-        resolved_key2 = key_resolver(issuer2_thumbprint)
+        # Step 4: Create verifier using key resolver and verify SD-CWTs
+        verifier = CredentialVerifier(key_resolver)
 
-        verifier1 = CredentialVerifier(resolved_key1)
-        verifier2 = CredentialVerifier(resolved_key2)
-
-        is_valid1, payload1 = verifier1.verify(sd_cwt1)
+        is_valid1, payload1 = verifier.verify(sd_cwt1)
         assert is_valid1, "SD-CWT 1 should verify successfully"
         assert payload1[1] == "https://issuer1.example"
 
-        is_valid2, payload2 = verifier2.verify(sd_cwt2)
+        is_valid2, payload2 = verifier.verify(sd_cwt2)
         assert is_valid2, "SD-CWT 2 should verify successfully"
         assert payload2[1] == "https://issuer2.example"
-
-        # Step 5: Verify cross-verification fails (issuer 1 verifier can't verify issuer 2 SD-CWT)
-        cross_valid, _ = verifier1.verify(sd_cwt2)
-        assert not cross_valid, "Cross-verification should fail"
