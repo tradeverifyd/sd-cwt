@@ -51,7 +51,12 @@ sd-cwt-cli issue_sd_cwt \
     / MPa /                                "tensile_strength": 420,
     / MPa /                                "yield_strength": 350,
     / percentage /                         "elongation": 18.5
-  })
+  }),
+  / optional to disclose /               "inspection_dates": 59([
+    / initial inspection /                  1549560720,
+    / quality check /                       60(1612498440),
+    / final inspection /                    60(1674004740)
+  ])
 }'
 ```
 
@@ -87,7 +92,12 @@ sd-cwt-cli present_sd_cwt \
     / manganese percentage /               "manganese": 1.20,
     / phosphorus percentage /              "phosphorus": 0.040,
     / sulfur percentage /                  "sulfur": 0.050
-  }
+  },
+  / chosen to disclose /                 "inspection_dates": [
+    / initial inspection /                  1549560720,
+    / quality check disclosed /             1612498440
+    / final inspection withheld /
+  ]
   / other claims have been redacted /
 }'
 ```
