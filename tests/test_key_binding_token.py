@@ -5,7 +5,7 @@ import time
 from typing import Any, Dict
 
 from sd_cwt import cbor_utils
-from sd_cwt.cose_keys import cose_key_generate, CoseAlgorithm
+from sd_cwt.cose_keys import cose_key_generate
 from sd_cwt.cose_sign1 import ES256Signer, ES256Verifier, cose_sign1_sign, cose_sign1_verify
 from sd_cwt.holder_binding import create_sd_kbt, create_cnf_claim, validate_sd_kbt_structure
 
@@ -16,7 +16,7 @@ class TestKeyBindingToken:
     def test_generate_holder_key_for_kbt(self):
         """Test generating a holder key for Key Binding Token."""
         # Generate ES256 holder key
-        holder_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        holder_key_cbor = cose_key_generate()
         holder_key = cbor_utils.decode(holder_key_cbor)
 
         # Verify holder key structure for KBT use
@@ -31,8 +31,8 @@ class TestKeyBindingToken:
     def test_create_simple_sd_cwt_without_redaction(self):
         """Test creating a simple SD-CWT with holder binding but no redaction."""
         # Generate issuer and holder keys
-        issuer_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
-        holder_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        issuer_key_cbor = cose_key_generate()
+        holder_key_cbor = cose_key_generate()
 
         # Create issuer signer
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
@@ -188,13 +188,13 @@ class TestKeyBindingToken:
 
         # Step 1: Generate holder key
         print("Step 1: Generating holder key...")
-        holder_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        holder_key_cbor = cose_key_generate()
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
         print(f"✓ Generated ES256 holder key with curve P-{holder_key_dict[-1]}")
 
         # Step 2: Create SD-CWT with holder binding (no redaction)
         print("\\nStep 2: Creating SD-CWT with holder binding...")
-        issuer_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        issuer_key_cbor = cose_key_generate()
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
         issuer_signer = ES256Signer(issuer_key_dict[-4])
 
@@ -276,8 +276,8 @@ class TestKeyBindingToken:
     def test_kbt_with_thumbprint_cnf(self):
         """Test KBT workflow with COSE Key Thumbprint in cnf claim."""
         # Generate keys
-        issuer_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
-        holder_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        issuer_key_cbor = cose_key_generate()
+        holder_key_cbor = cose_key_generate()
 
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
         holder_key_dict = cbor_utils.decode(holder_key_cbor)

@@ -1,7 +1,6 @@
 """SD-CWT: SPICE SD-CWT specification implementation."""
 
 from .cose_keys import (
-    CoseAlgorithm,
     cose_key_from_dict,
     cose_key_generate,
     cose_key_get_public,
@@ -50,8 +49,6 @@ __all__ = [
     "cose_key_to_dict",
     "cose_key_get_public",
     "cose_key_thumbprint",
-    # Algorithm enumeration (needed for key generation)
-    "CoseAlgorithm",
     # EDN Redaction
     "edn_to_redacted_cbor",
     # Salt generators for deterministic testing

@@ -3,7 +3,7 @@
 import pytest
 
 from sd_cwt import cbor_utils, edn_utils
-from sd_cwt.cose_keys import cose_key_generate, CoseAlgorithm
+from sd_cwt.cose_keys import cose_key_generate
 from sd_cwt.thumbprint import CoseKeyThumbprint
 from sd_cwt.validation import CDDLValidator
 
@@ -14,7 +14,7 @@ class TestES256KeyGeneration:
     def test_generate_es256_private_key(self):
         """Test generating ES256 private key with all components."""
         # Generate ES256 key pair
-        key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        key_cbor = cose_key_generate()
 
         # Decode and verify structure
         key = cbor_utils.decode(key_cbor)
@@ -37,7 +37,7 @@ class TestES256KeyGeneration:
     def test_convert_private_key_to_public_key(self):
         """Test extracting public key from private key."""
         # Generate ES256 key pair
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
         private_key = cbor_utils.decode(private_key_cbor)
 
         # Extract public key by removing private component
@@ -61,7 +61,7 @@ class TestES256KeyGeneration:
     def test_export_private_key_as_cbor(self):
         """Test exporting private key in CBOR format."""
         # Generate ES256 key pair
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
 
         # Verify it's valid CBOR
         assert isinstance(private_key_cbor, bytes)
@@ -85,7 +85,7 @@ class TestES256KeyGeneration:
     def test_export_public_key_as_cbor(self):
         """Test exporting public key in CBOR format."""
         # Generate and extract public key
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
         private_key = cbor_utils.decode(private_key_cbor)
         public_key = {k: v for k, v in private_key.items() if k != -4}
 
@@ -103,7 +103,7 @@ class TestES256KeyGeneration:
     def test_export_private_key_as_edn(self):
         """Test exporting private key in EDN format."""
         # Generate ES256 key pair
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
 
         # Convert to EDN
         edn_string = edn_utils.cbor_to_diag(private_key_cbor)
@@ -127,7 +127,7 @@ class TestES256KeyGeneration:
     def test_export_public_key_as_edn(self):
         """Test exporting public key in EDN format."""
         # Generate and extract public key
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
         private_key = cbor_utils.decode(private_key_cbor)
         public_key = {k: v for k, v in private_key.items() if k != -4}
         public_key_cbor = cbor_utils.encode(public_key)
@@ -153,7 +153,7 @@ class TestES256KeyGeneration:
     def test_validate_private_key_with_cddl(self):
         """Test CDDL validation of private key structure."""
         # Generate ES256 private key
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
 
         try:
             validator = CDDLValidator()
@@ -193,7 +193,7 @@ class TestES256KeyGeneration:
     def test_validate_public_key_with_cddl(self):
         """Test CDDL validation of public key structure."""
         # Generate and extract public key
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
         private_key = cbor_utils.decode(private_key_cbor)
         public_key = {k: v for k, v in private_key.items() if k != -4}
         public_key_cbor = cbor_utils.encode(public_key)
@@ -233,7 +233,7 @@ class TestES256KeyGeneration:
     def test_key_thumbprint_calculation(self):
         """Test COSE key thumbprint calculation for ES256 keys."""
         # Generate ES256 key pair
-        private_key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        private_key_cbor = cose_key_generate()
         private_key = cbor_utils.decode(private_key_cbor)
         public_key = {k: v for k, v in private_key.items() if k != -4}
 
@@ -257,7 +257,7 @@ class TestES256KeyGeneration:
         """Test that multiple key generations produce unique keys."""
         keys = []
         for _ in range(5):
-            key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+            key_cbor = cose_key_generate()
             key = cbor_utils.decode(key_cbor)
             keys.append(key)
 
@@ -276,7 +276,7 @@ class TestES256KeyGeneration:
     def test_key_component_validation(self):
         """Test validation of individual key components."""
         # Generate ES256 key
-        key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        key_cbor = cose_key_generate()
         key = cbor_utils.decode(key_cbor)
 
         # Test coordinate bounds (should be valid curve points)
@@ -302,7 +302,7 @@ class TestES256KeyGeneration:
     def test_specification_compatibility(self):
         """Test compatibility with specification examples."""
         # Generate key and export in specification-compatible formats
-        key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        key_cbor = cose_key_generate()
         key = cbor_utils.decode(key_cbor)
 
         # Test CBOR encoding follows specification
@@ -332,7 +332,7 @@ class TestES256KeyGeneration:
     def test_error_conditions(self):
         """Test error conditions and edge cases."""
         # Test that only ES256 is supported (other algorithms should fail)
-        key_cbor = cose_key_generate(CoseAlgorithm.ES256)
+        key_cbor = cose_key_generate()
         assert isinstance(key_cbor, bytes)
 
         # Verify the key is well-formed

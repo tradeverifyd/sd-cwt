@@ -7,44 +7,32 @@ from typing import Any
 
 
 class CoseKeyThumbprint:
-    """Compute COSE Key Thumbprints according to RFC 9679."""
+    """Compute COSE Key Thumbprints for ES256/P-256 keys according to RFC 9679."""
 
-    # Required members for each key type according to RFC 9679
-    REQUIRED_MEMBERS = {
-        # OKP (kty = 1)
-        1: [1, -1, -2],  # kty, crv, x
-        # EC2 (kty = 2)
-        2: [1, -1, -2, -3],  # kty, crv, x, y
-        # RSA (kty = 3)
-        3: [1, -1, -2],  # kty, n, e
-        # Symmetric (kty = 4)
-        4: [1, -1],  # kty, k
-    }
+    # Required members for EC2 (kty = 2) only
+    REQUIRED_MEMBERS = [1, -1, -2, -3]  # kty, crv, x, y
 
     @staticmethod
     def canonical_cbor(cose_key: dict[int, Any]) -> bytes:
-        """Create canonical CBOR representation of COSE key for thumbprint.
+        """Create canonical CBOR representation of EC2/P-256 COSE key for thumbprint.
 
         Args:
-            cose_key: COSE key as a dictionary with integer labels
+            cose_key: COSE key as a dictionary with integer labels (must be EC2)
 
         Returns:
             Canonical CBOR encoding of the key
 
         Raises:
-            ValueError: If key type is unsupported or required fields are missing
+            ValueError: If key type is not EC2 or required fields are missing
         """
-        # Get key type
+        # Verify this is an EC2 key
         kty = cose_key.get(1)
-        if kty not in CoseKeyThumbprint.REQUIRED_MEMBERS:
-            raise ValueError(f"Unsupported key type: {kty}")
+        if kty != 2:
+            raise ValueError(f"Only EC2 keys are supported, got kty: {kty}")
 
-        # Get required members for this key type
-        required = CoseKeyThumbprint.REQUIRED_MEMBERS[kty]
-
-        # Create filtered key with only required members
+        # Create filtered key with only required members for EC2
         filtered_key = {}
-        for label in required:
+        for label in CoseKeyThumbprint.REQUIRED_MEMBERS:
             if label not in cose_key:
                 raise ValueError(f"Required field {label} missing from COSE key")
             filtered_key[label] = cose_key[label]
@@ -102,19 +90,18 @@ class CoseKeyThumbprint:
         return f"urn:ietf:params:oauth:ckt:{hash_alg}:{b64url}"
 
     @staticmethod
-    def from_pem(pem_data: bytes, key_type: str = "EC2") -> dict[int, Any]:
-        """Convert PEM key to COSE key format.
+    def from_pem(pem_data: bytes) -> dict[int, Any]:
+        """Convert PEM EC key to COSE EC2/P-256 key format.
 
         Args:
-            pem_data: PEM encoded key
-            key_type: Type of key (EC2, RSA, etc.)
+            pem_data: PEM encoded EC key (must be P-256)
 
         Returns:
-            COSE key dictionary
+            COSE key dictionary for EC2/P-256
         """
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        from cryptography.hazmat.primitives.asymmetric import ec
 
         # Load the PEM key
         try:
@@ -130,49 +117,24 @@ class CoseKeyThumbprint:
             else:
                 raise ValueError("Could not extract public key from private key") from None
 
-        # Convert to COSE format based on key type
-        if isinstance(key, ec.EllipticCurvePublicKey):
-            # EC2 key
-            public_numbers = key.public_numbers()
-            curve = public_numbers.curve
+        # Only support EC keys
+        if not isinstance(key, ec.EllipticCurvePublicKey):
+            raise ValueError("Only EC keys are supported")
 
-            # Map curve to COSE curve identifier
-            if isinstance(curve, ec.SECP256R1):
-                crv = 1  # P-256
-            elif isinstance(curve, ec.SECP384R1):
-                crv = 2  # P-384
-            elif isinstance(curve, ec.SECP521R1):
-                crv = 3  # P-521
-            else:
-                raise ValueError(f"Unsupported curve: {curve.name}")
+        public_numbers = key.public_numbers()
+        curve = public_numbers.curve
 
-            # Get x and y coordinates as bytes
-            x_bytes = public_numbers.x.to_bytes((public_numbers.x.bit_length() + 7) // 8, "big")
-            y_bytes = public_numbers.y.to_bytes((public_numbers.y.bit_length() + 7) // 8, "big")
+        # Only support P-256
+        if not isinstance(curve, ec.SECP256R1):
+            raise ValueError("Only P-256 curve is supported")
 
-            return {
-                1: 2,  # kty: EC2
-                -1: crv,  # crv
-                -2: x_bytes,  # x
-                -3: y_bytes,  # y
-            }
+        # Get x and y coordinates as 32-byte values for P-256
+        x_bytes = public_numbers.x.to_bytes(32, "big")
+        y_bytes = public_numbers.y.to_bytes(32, "big")
 
-        elif isinstance(key, rsa.RSAPublicKey):
-            # RSA key
-            rsa_public_numbers = key.public_numbers()
-
-            n_bytes = rsa_public_numbers.n.to_bytes(
-                (rsa_public_numbers.n.bit_length() + 7) // 8, "big"
-            )
-            e_bytes = rsa_public_numbers.e.to_bytes(
-                (rsa_public_numbers.e.bit_length() + 7) // 8, "big"
-            )
-
-            return {
-                1: 3,  # kty: RSA
-                -1: n_bytes,  # n
-                -2: e_bytes,  # e
-            }
-
-        else:
-            raise ValueError(f"Unsupported key type: {type(key)}")
+        return {
+            1: 2,  # kty: EC2
+            -1: 1,  # crv: P-256
+            -2: x_bytes,  # x
+            -3: y_bytes,  # y
+        }
