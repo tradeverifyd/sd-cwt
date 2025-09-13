@@ -153,18 +153,40 @@ def hash_disclosure(disclosure: bytes, hash_alg: str = "sha-256") -> bytes:
 def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
     """Recursively find all redacted claims in a claims dictionary.
 
+    Per SD-CWT specification: cnf (8), cnonce (39), and standard claims
+    other than subject (2) MUST NOT be redacted.
+
     Args:
         claims: Claims dictionary potentially containing redaction tags
 
     Returns:
         List of (path, value) tuples for redacted claims
     """
+    # Claims that are mandatory to disclose (MUST NOT be redacted) per specification
+    MANDATORY_TO_DISCLOSE_CLAIMS = {
+        1,   # iss - issuer
+        3,   # aud - audience
+        4,   # exp - expiration
+        5,   # nbf - not before
+        6,   # iat - issued at
+        7,   # cti - CWT ID
+        8,   # cnf - confirmation (holder binding)
+        39,  # cnonce - client nonce
+    }
+
     redacted = []
 
     def _traverse(obj: Any, path: list[Any]) -> None:
         if isinstance(obj, dict):
             for key, value in obj.items():
                 current_path = path + [key]
+
+                # Skip mandatory-to-disclose claims at top level (path is empty)
+                if not path and key in MANDATORY_TO_DISCLOSE_CLAIMS:
+                    # Continue traversing into the value but don't redact the key
+                    if isinstance(value, (dict, list)):
+                        _traverse(value, current_path)
+                    continue
 
                 # Check if value is tagged for redaction
                 if isinstance(value, cbor2.CBORTag):
