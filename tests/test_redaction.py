@@ -9,6 +9,8 @@ import pytest
 from sd_cwt.redaction import (
     REDACTED_CLAIM_KEY_TAG,
     REDACTED_CLAIM_ELEMENT_TAG,
+    SecureSaltGenerator,
+    SeededSaltGenerator,
     build_sd_cwt_claims,
     cbor_to_dict,
     create_disclosure,
@@ -452,3 +454,156 @@ class TestEndToEnd:
 
         # Return for external verification
         return cbor_hex, [d.hex() for d in disclosures]
+
+
+class TestSaltGenerators:
+    """Test salt generation functionality."""
+
+    def test_secure_salt_generator(self) -> None:
+        """Test secure salt generator produces different salts."""
+        generator = SecureSaltGenerator()
+
+        salt1 = generator.generate_salt()
+        salt2 = generator.generate_salt()
+
+        assert len(salt1) == 16
+        assert len(salt2) == 16
+        assert salt1 != salt2  # Should be different
+
+        # Test custom length
+        salt32 = generator.generate_salt(32)
+        assert len(salt32) == 32
+
+    def test_seeded_salt_generator_deterministic(self) -> None:
+        """Test seeded salt generator produces deterministic output."""
+        generator1 = SeededSaltGenerator(seed=42)
+        generator2 = SeededSaltGenerator(seed=42)
+        generator3 = SeededSaltGenerator(seed=123)
+
+        # Same seed should produce same salts
+        salt1a = generator1.generate_salt()
+        salt1b = generator2.generate_salt()
+        assert salt1a == salt1b
+
+        # Different seed should produce different salts
+        salt3 = generator3.generate_salt()
+        assert salt1a != salt3
+
+        # Multiple salts from same generator should be different
+        salt1c = generator1.generate_salt()
+        assert salt1a != salt1c
+
+    def test_generate_salt_with_custom_generator(self) -> None:
+        """Test generate_salt function with custom generator."""
+        seeded_gen = SeededSaltGenerator(seed=777)
+
+        # Test with custom generator
+        salt1 = generate_salt(salt_generator=seeded_gen)
+        salt2 = generate_salt(salt_generator=seeded_gen)
+
+        assert len(salt1) == 16
+        assert len(salt2) == 16
+        assert salt1 != salt2  # Different calls should give different results
+
+        # Test reproducibility with same seed
+        seeded_gen2 = SeededSaltGenerator(seed=777)
+        salt3 = generate_salt(salt_generator=seeded_gen2)
+        assert salt3 == salt1  # First salt from same seed should match
+
+    def test_deterministic_redaction(self) -> None:
+        """Test that redaction with seeded generator is deterministic."""
+        edn = """
+        {
+            "name": 59("Alice"),
+            "email": 59("alice@example.com"),
+            "age": 30
+        }
+        """
+
+        seeded_gen1 = SeededSaltGenerator(seed=12345)
+        seeded_gen2 = SeededSaltGenerator(seed=12345)
+
+        # Generate with same seed twice
+        cbor1, disclosures1 = edn_to_redacted_cbor(edn, seeded_gen1)
+        cbor2, disclosures2 = edn_to_redacted_cbor(edn, seeded_gen2)
+
+        # Results should be identical
+        assert cbor1 == cbor2
+        assert len(disclosures1) == len(disclosures2)
+        for d1, d2 in zip(disclosures1, disclosures2):
+            assert d1 == d2
+
+        # With different seed, results should be different
+        seeded_gen3 = SeededSaltGenerator(seed=54321)
+        cbor3, disclosures3 = edn_to_redacted_cbor(edn, seeded_gen3)
+
+        assert cbor1 != cbor3  # Different salts -> different hashes -> different CBOR
+        assert disclosures1 != disclosures3
+
+    def test_deterministic_hex_output(self) -> None:
+        """Test reproducible hex output for documentation/examples."""
+        edn = """
+        {
+            1: "https://issuer.example",
+            2: "user123",
+            4: 1725330600,
+            "email": 59("alice@example.com"),
+            "role": "admin",
+            "verified": 59(true)
+        }
+        """
+
+        # Fixed seed for reproducible documentation
+        seeded_gen = SeededSaltGenerator(seed=0x12345678)
+        cbor_claims, disclosures = edn_to_redacted_cbor(edn, seeded_gen)
+
+        # Convert to hex
+        hex_output = cbor_claims.hex()
+
+        # Verify structure
+        claims = cbor2.loads(cbor_claims)
+        assert claims[1] == "https://issuer.example"
+        assert claims[2] == "user123"
+        assert claims["role"] == "admin"
+        assert "email" not in claims
+        assert "verified" not in claims
+
+        # Check that we have expected number of hashes
+        simple_59 = cbor2.CBORSimpleValue(59)
+        assert simple_59 in claims
+        assert len(claims[simple_59]) == 2  # Two redacted claims
+
+        # Print for documentation (this will be deterministic)
+        print(f"\nDeterministic CBOR hex: {hex_output}")
+        print(f"Disclosure count: {len(disclosures)}")
+
+        # Verify this is reproducible
+        seeded_gen2 = SeededSaltGenerator(seed=0x12345678)
+        cbor_claims2, disclosures2 = edn_to_redacted_cbor(edn, seeded_gen2)
+        assert cbor_claims == cbor_claims2
+        assert disclosures == disclosures2
+
+    def test_secure_vs_seeded_generators(self) -> None:
+        """Test that secure and seeded generators behave differently."""
+        edn = """
+        {
+            "test": 59("value")
+        }
+        """
+
+        # Generate with secure generator twice
+        cbor1, _ = edn_to_redacted_cbor(edn)  # Uses secure by default
+        cbor2, _ = edn_to_redacted_cbor(edn)  # Uses secure by default
+
+        # Should be different due to random salts
+        assert cbor1 != cbor2
+
+        # Generate with seeded generator twice
+        seeded_gen1 = SeededSaltGenerator(seed=999)
+        seeded_gen2 = SeededSaltGenerator(seed=999)
+
+        cbor3, _ = edn_to_redacted_cbor(edn, seeded_gen1)
+        cbor4, _ = edn_to_redacted_cbor(edn, seeded_gen2)
+
+        # Should be identical due to same seed
+        assert cbor3 == cbor4

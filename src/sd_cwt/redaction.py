@@ -2,7 +2,7 @@
 
 import hashlib
 import secrets
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import cbor2
 import cbor_diag  # type: ignore[import-untyped]
@@ -11,6 +11,67 @@ import cbor_diag  # type: ignore[import-untyped]
 # CBOR tags for redaction (from SD-CWT spec)
 REDACTED_CLAIM_KEY_TAG = 59  # Simple value for redacted claim keys
 REDACTED_CLAIM_ELEMENT_TAG = 60  # Tag for redacted array elements
+
+
+class SaltGenerator(Protocol):
+    """Protocol for generating cryptographic salts for disclosures."""
+
+    def generate_salt(self, length: int = 16) -> bytes:
+        """Generate a cryptographic salt.
+
+        Args:
+            length: Salt length in bytes (default 16 for 128 bits)
+
+        Returns:
+            Random salt bytes
+        """
+
+
+class SecureSaltGenerator:
+    """Cryptographically secure salt generator using secrets module."""
+
+    def generate_salt(self, length: int = 16) -> bytes:
+        """Generate a cryptographically secure salt.
+
+        Args:
+            length: Salt length in bytes (default 16 for 128 bits)
+
+        Returns:
+            Cryptographically secure random salt bytes
+        """
+        return secrets.token_bytes(length)
+
+
+class SeededSaltGenerator:
+    """Deterministic salt generator for testing purposes.
+
+    WARNING: This generator is NOT cryptographically secure and should
+    only be used for testing and reproducible examples.
+    """
+
+    def __init__(self, seed: int = 42):
+        """Initialize with a seed value.
+
+        Args:
+            seed: Integer seed for deterministic salt generation
+        """
+        import random
+        self._random = random.Random(seed)
+
+    def generate_salt(self, length: int = 16) -> bytes:
+        """Generate a deterministic salt based on the seed.
+
+        Args:
+            length: Salt length in bytes (default 16 for 128 bits)
+
+        Returns:
+            Deterministic salt bytes (NOT cryptographically secure)
+        """
+        return bytes(self._random.getrandbits(8) for _ in range(length))
+
+
+# Default secure salt generator instance
+_default_salt_generator = SecureSaltGenerator()
 
 
 def parse_edn_to_cbor(edn_string: str) -> bytes:
@@ -37,16 +98,19 @@ def cbor_to_dict(cbor_bytes: bytes) -> dict[Any, Any]:
     return cbor2.loads(cbor_bytes)
 
 
-def generate_salt(length: int = 16) -> bytes:
+def generate_salt(length: int = 16, salt_generator: Optional[SaltGenerator] = None) -> bytes:
     """Generate cryptographically secure random salt.
 
     Args:
         length: Salt length in bytes (default 16 for 128 bits)
+        salt_generator: Optional custom salt generator (uses secure default if None)
 
     Returns:
         Random salt bytes
     """
-    return secrets.token_bytes(length)
+    if salt_generator is None:
+        salt_generator = _default_salt_generator
+    return salt_generator.generate_salt(length)
 
 
 def create_disclosure(salt: bytes, claim_name: Any, claim_value: Any) -> bytes:
@@ -127,13 +191,15 @@ def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
 
 def process_redactions(
     claims: dict[Any, Any],
-    redacted_paths: list[tuple[list[Any], Any]]
+    redacted_paths: list[tuple[list[Any], Any]],
+    salt_generator: Optional[SaltGenerator] = None
 ) -> tuple[dict[Any, Any], list[bytes], list[bytes]]:
     """Process redactions and create disclosures.
 
     Args:
         claims: Original claims dictionary
         redacted_paths: List of (path, key/value) tuples to redact
+        salt_generator: Optional custom salt generator (uses secure default if None)
 
     Returns:
         Tuple of (redacted_claims, disclosures, hashes)
@@ -172,7 +238,7 @@ def process_redactions(
         if path:  # Nested redaction
             if isinstance(container, dict) and claim_key in container:
                 # Redacting a key in nested dict
-                salt = generate_salt()
+                salt = generate_salt(salt_generator=salt_generator)
                 claim_value = container[claim_key]
 
                 disclosure = create_disclosure(salt, claim_key, claim_value)
@@ -184,7 +250,7 @@ def process_redactions(
                 del container[claim_key]
             elif isinstance(parent, list) and isinstance(last_step, int):
                 # Redacting an array element
-                salt = generate_salt()
+                salt = generate_salt(salt_generator=salt_generator)
 
                 # The claim_key here is actually the value for array elements
                 disclosure = create_disclosure(salt, last_step, claim_key)
@@ -198,7 +264,7 @@ def process_redactions(
                 parent[last_step] = None
         else:  # Top-level redaction
             if isinstance(redacted_claims, dict) and claim_key in redacted_claims:
-                salt = generate_salt()
+                salt = generate_salt(salt_generator=salt_generator)
                 claim_value = redacted_claims[claim_key]
 
                 disclosure = create_disclosure(salt, claim_key, claim_value)
@@ -245,7 +311,10 @@ def build_sd_cwt_claims(
     return sd_cwt_claims
 
 
-def edn_to_redacted_cbor(edn_string: str) -> tuple[bytes, list[bytes]]:
+def edn_to_redacted_cbor(
+    edn_string: str,
+    salt_generator: Optional[SaltGenerator] = None
+) -> tuple[bytes, list[bytes]]:
     """Convert EDN with redaction tags to redacted CBOR claims.
 
     This is the main spanning function that:
@@ -256,6 +325,7 @@ def edn_to_redacted_cbor(edn_string: str) -> tuple[bytes, list[bytes]]:
 
     Args:
         edn_string: EDN string with redaction tags
+        salt_generator: Optional custom salt generator (uses secure default if None)
 
     Returns:
         Tuple of (cbor_claims, disclosures)
@@ -268,7 +338,9 @@ def edn_to_redacted_cbor(edn_string: str) -> tuple[bytes, list[bytes]]:
     redacted_paths = find_redacted_claims(claims)
 
     # Process redactions
-    redacted_claims, disclosures, hashes = process_redactions(claims, redacted_paths)
+    redacted_claims, disclosures, hashes = process_redactions(
+        claims, redacted_paths, salt_generator
+    )
 
     # Build SD-CWT claims
     sd_cwt_claims = build_sd_cwt_claims(redacted_claims, hashes)

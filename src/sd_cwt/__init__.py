@@ -15,6 +15,9 @@ from .cose_sign1 import (
     cose_sign1_verify,
 )
 from .redaction import (
+    SecureSaltGenerator,
+    SeededSaltGenerator,
+    SaltGenerator,
     edn_to_redacted_cbor,
 )
 
@@ -44,4 +47,8 @@ __all__ = [
     "CoseAlgorithm",
     # EDN Redaction
     "edn_to_redacted_cbor",
+    # Salt generators for deterministic testing
+    "SaltGenerator",
+    "SecureSaltGenerator",
+    "SeededSaltGenerator",
 ]
