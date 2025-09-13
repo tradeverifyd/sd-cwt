@@ -10,7 +10,7 @@ install:  ## Install the package
 
 dev:  ## Install development dependencies
 	uv venv
-	uv pip install -e ".[dev,docs]"
+	uv pip install -e ".[dev]"
 	pre-commit install
 
 test:  ## Run all tests
@@ -55,6 +55,9 @@ docs:  ## Build documentation
 
 docs-serve:  ## Serve documentation locally
 	uv run mkdocs serve
+
+validate-example:  ## Run CBOR validation example
+	uv run python examples/validate_cbor.py
 
 pre-commit:  ## Run pre-commit hooks
 	pre-commit run --all-files

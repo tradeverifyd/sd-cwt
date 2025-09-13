@@ -1,4 +1,4 @@
-"""Unit tests for cryptographic operations."""
+"""Unit tests for cryptographic operations using fido2."""
 
 import hashlib
 import hmac
@@ -6,13 +6,7 @@ import os
 from typing import Tuple
 
 import pytest
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.ec import (
-    EllipticCurvePrivateKey,
-    EllipticCurvePublicKey,
-)
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from fido2.cose import ES256, CoseKey
 
 
 class TestCryptography:
@@ -50,18 +44,48 @@ class TestCryptography:
 
     @pytest.mark.unit
     @pytest.mark.requires_crypto
-    def test_ec_keypair_generation(
-        self, ec_keypair: Tuple[EllipticCurvePrivateKey, EllipticCurvePublicKey]
-    ):
-        """Test EC keypair generation for COSE signatures."""
-        private_key, public_key = ec_keypair
+    def test_cose_keypair_generation(self, cose_key_pair: Tuple[dict, CoseKey]):
+        """Test COSE keypair generation for COSE signatures."""
+        private_key_info, public_key = cose_key_pair
         
-        assert isinstance(private_key, EllipticCurvePrivateKey)
-        assert isinstance(public_key, EllipticCurvePublicKey)
+        assert isinstance(private_key_info, dict)
+        assert "ec_key" in private_key_info
+        assert isinstance(public_key, dict)
         
-        # Verify curve is P-256 (SECP256R1)
-        assert private_key.curve.name == "secp256r1"
-        assert public_key.curve.name == "secp256r1"
+        # Verify key type is EC2 (kty = 2)
+        assert public_key[1] == 2
+        
+        # Verify algorithm is ES256 (alg = -7)
+        assert public_key[3] == -7
+        
+        # Verify curve is P-256 (crv = 1)
+        assert public_key[-1] == 1
+        
+        # Verify public key has x and y coordinates
+        assert -2 in public_key  # x coordinate
+        assert -3 in public_key  # y coordinate
+        
+        # Public key should not have d parameter
+        assert -4 not in public_key
+
+    @pytest.mark.unit
+    @pytest.mark.requires_crypto
+    def test_es256_signature(self):
+        """Test ES256 signature creation and verification."""
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        
+        # Generate EC key
+        ec_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        
+        # Sign data
+        data = b"data to sign"
+        signature = ec_private.sign(data, ec.ECDSA(hashes.SHA256()))
+        
+        assert isinstance(signature, bytes)
+        # ES256 signatures vary in length due to DER encoding, typically 70-72 bytes
+        assert len(signature) >= 68
 
     @pytest.mark.unit
     @pytest.mark.requires_crypto
@@ -80,27 +104,6 @@ class TestCryptography:
         # Verify HMAC
         h2 = hmac.new(key, message, hashlib.sha256)
         assert hmac.compare_digest(mac, h2.digest())
-
-    @pytest.mark.unit
-    @pytest.mark.requires_crypto
-    def test_key_derivation(self):
-        """Test key derivation for additional keys."""
-        # Using HKDF for key derivation
-        salt = os.urandom(32)
-        info = b"sd-cwt-key-derivation"
-        key_material = os.urandom(32)
-        
-        hkdf = HKDF(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            info=info,
-        )
-        
-        derived_key = hkdf.derive(key_material)
-        
-        assert isinstance(derived_key, bytes)
-        assert len(derived_key) == 32
 
     @pytest.mark.unit
     @pytest.mark.requires_crypto

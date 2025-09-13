@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 import cbor2
 import pytest
+from fido2.cose import CoseKey
 
 
 class TestEndToEnd:
@@ -69,10 +70,10 @@ class TestEndToEnd:
 
     @pytest.mark.integration
     def test_selective_disclosure_with_holder_binding(
-        self, sample_claims: Dict[str, Any], ec_keypair
+        self, sample_claims: Dict[str, Any], cose_key_pair
     ):
         """Test SD-CWT with holder binding."""
-        private_key, public_key = ec_keypair
+        private_key, public_key = cose_key_pair
         
         # Add holder binding claim
         claims = sample_claims.copy()
@@ -176,3 +177,21 @@ class TestEndToEnd:
         assert "_sd_alg" in decoded
         assert isinstance(decoded["_sd"], list)
         assert decoded["_sd_alg"] == "sha-256"
+
+    @pytest.mark.integration
+    def test_cose_key_operations(self, cose_key_pair):
+        """Test COSE key operations with fido2."""
+        private_key_info, public_key = cose_key_pair
+        
+        # Verify keys are properly formatted
+        assert isinstance(private_key_info, dict)
+        assert "ec_key" in private_key_info
+        assert isinstance(public_key, dict)
+        
+        # Check required COSE public key parameters
+        assert 1 in public_key  # kty
+        assert 3 in public_key  # alg
+        assert -1 in public_key  # crv
+        assert -2 in public_key  # x
+        assert -3 in public_key  # y
+        assert -4 not in public_key  # d should not be in public key

@@ -25,32 +25,43 @@ classifiers = [
 
 dependencies = [
     "cbor2>=5.4.0",
-    "cryptography>=41.0.0",
+    "fido2>=1.1.0",  # For CBOR/COSE cryptographic operations
     "pydantic>=2.0.0",
+    "cbor-diag>=1.0.0",  # For CBOR diagnostic notation
+    "pycddl>=0.4.0",  # For CDDL validation
 ]
 
 [project.optional-dependencies]
 dev = [
+    # Testing
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+    "pytest-xdist>=3.3.0",
+    
+    # Code quality
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.3.0",
-]
-
-docs = [
+    
+    # Documentation
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.22.0",
+    
+    # Development tools
+    "ipython>=8.0.0",
+    "bandit>=1.7.0",  # Security linting
+    "safety>=2.3.0",  # Dependency security checks
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/sd-cwt"
-Repository = "https://github.com/yourusername/sd-cwt"
-Documentation = "https://github.com/yourusername/sd-cwt#readme"
-Issues = "https://github.com/yourusername/sd-cwt/issues"
+Homepage = "https://github.com/tradeverifyd/sd-cwt"
+Repository = "https://github.com/tradeverifyd/sd-cwt"
+Documentation = "https://github.com/tradeverifyd/sd-cwt#readme"
+Issues = "https://github.com/tradeverifyd/sd-cwt/issues"
 
 [project.scripts]
 sd-cwt = "sd_cwt.cli:main"

@@ -4,22 +4,11 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Generator
+from typing import Any, Dict
 
 import cbor2
 import pytest
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.ec import (
-    EllipticCurvePrivateKey,
-    EllipticCurvePublicKey,
-)
-from cryptography.hazmat.primitives.serialization import (
-    Encoding,
-    NoEncryptionAvailable,
-    PrivateFormat,
-    PublicFormat,
-)
+from fido2.cose import ES256, CoseKey
 
 
 @pytest.fixture(scope="session")
@@ -29,11 +18,27 @@ def test_data_dir() -> Path:
 
 
 @pytest.fixture(scope="session")
-def ec_keypair() -> tuple[EllipticCurvePrivateKey, EllipticCurvePublicKey]:
-    """Generate an EC P-256 keypair for testing."""
-    private_key = ec.generate_private_key(ec.SECP256R1())
-    public_key = private_key.public_key()
-    return private_key, public_key
+def cose_key_pair() -> tuple[dict, CoseKey]:
+    """Generate a COSE ES256 keypair for testing using fido2."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    
+    # Generate EC key using cryptography
+    ec_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    ec_public = ec_private.public_key()
+    
+    # Convert public key to COSE format
+    public_key = ES256.from_cryptography_key(ec_public)
+    
+    # For private key, we'll keep the cryptography object
+    # and build a dict representation when needed
+    private_key_info = {
+        "ec_key": ec_private,
+        "cose_public": public_key,
+    }
+    
+    return private_key_info, public_key
 
 
 @pytest.fixture
@@ -110,12 +115,6 @@ def sample_salts() -> Dict[str, bytes]:
         "phone_number": b"salt4" * 8,
         "birthdate": b"salt5" * 8,
     }
-
-
-@pytest.fixture
-def hash_function():
-    """Provide the hash function for SD calculations."""
-    return hashes.SHA256()
 
 
 @pytest.fixture(autouse=True)
