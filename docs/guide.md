@@ -96,8 +96,8 @@ sd-cwt-cli present_sd_cwt \
   / chosen to disclose /                 "inspection_dates": [
     / initial inspection /                  1549560720,
     / quality check disclosed /             1612498440
-    / final inspection withheld /
+    / ... final inspection redacted / 
   ]
-  / other claims have been redacted /
+  / ... other claims redacted /
 }'
 ```
