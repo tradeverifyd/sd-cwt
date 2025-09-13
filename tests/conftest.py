@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import cbor2
 import pytest
@@ -20,29 +20,28 @@ def test_data_dir() -> Path:
 @pytest.fixture(scope="session")
 def cose_key_pair() -> tuple[dict, CoseKey]:
     """Generate a COSE ES256 keypair for testing using fido2."""
-    from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
-    
+    from cryptography.hazmat.primitives.asymmetric import ec
+
     # Generate EC key using cryptography
     ec_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
     ec_public = ec_private.public_key()
-    
+
     # Convert public key to COSE format
     public_key = ES256.from_cryptography_key(ec_public)
-    
+
     # For private key, we'll keep the cryptography object
     # and build a dict representation when needed
     private_key_info = {
         "ec_key": ec_private,
         "cose_public": public_key,
     }
-    
+
     return private_key_info, public_key
 
 
 @pytest.fixture
-def sample_claims() -> Dict[str, Any]:
+def sample_claims() -> dict[str, Any]:
     """Provide sample JWT/CWT claims for testing."""
     now = datetime.now(timezone.utc)
     return {
@@ -71,7 +70,7 @@ def sample_claims() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def minimal_claims() -> Dict[str, Any]:
+def minimal_claims() -> dict[str, Any]:
     """Provide minimal JWT/CWT claims for testing."""
     now = datetime.now(timezone.utc)
     return {
@@ -82,7 +81,7 @@ def minimal_claims() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def selective_disclosure_claims() -> Dict[str, Any]:
+def selective_disclosure_claims() -> dict[str, Any]:
     """Claims marked for selective disclosure."""
     return {
         "given_name": "John",
@@ -106,7 +105,7 @@ def cbor_decoder():
 
 
 @pytest.fixture
-def sample_salts() -> Dict[str, bytes]:
+def sample_salts() -> dict[str, bytes]:
     """Provide sample salts for testing selective disclosure."""
     return {
         "given_name": b"salt1" * 8,  # 40 bytes
@@ -163,9 +162,9 @@ class TestDataManager:
     def __init__(self, base_path: Path):
         self.base_path = base_path
 
-    def read_json(self, filename: str) -> Dict[str, Any]:
+    def read_json(self, filename: str) -> dict[str, Any]:
         """Read JSON test data file."""
-        with open(self.base_path / filename, "r") as f:
+        with open(self.base_path / filename) as f:
             return json.load(f)
 
     def read_cbor(self, filename: str) -> Any:
@@ -173,7 +172,7 @@ class TestDataManager:
         with open(self.base_path / filename, "rb") as f:
             return cbor2.load(f)
 
-    def write_json(self, filename: str, data: Dict[str, Any]) -> None:
+    def write_json(self, filename: str, data: dict[str, Any]) -> None:
         """Write JSON test data file."""
         with open(self.base_path / filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -217,9 +216,7 @@ def performance_timer():
 
 def pytest_configure(config):
     """Configure pytest with custom settings."""
-    config.addinivalue_line(
-        "markers", "requires_network: mark test as requiring network access"
-    )
+    config.addinivalue_line("markers", "requires_network: mark test as requiring network access")
     config.addinivalue_line(
         "markers", "requires_crypto: mark test as requiring cryptographic operations"
     )

@@ -219,13 +219,18 @@ canonical-cose-key = okp-thumbprint / ec2-thumbprint / rsa-thumbprint / symmetri
 """
 
 # Combined CDDL for full SD-CWT with COSE keys
-COMBINED_CDDL = """
+COMBINED_CDDL = (
+    """
 ; Combined CDDL for SD-CWT with COSE Key support
 
-""" + SD_CWT_CDDL + """
+"""
+    + SD_CWT_CDDL
+    + """
 
 ; COSE Key definition for use in cnf claim
-""" + COSE_KEY_THUMBPRINT_CDDL
+"""
+    + COSE_KEY_THUMBPRINT_CDDL
+)
 
 # Additional CDDL for test vectors
 TEST_VECTOR_CDDL = """

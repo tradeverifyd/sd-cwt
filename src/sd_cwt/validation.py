@@ -1,6 +1,6 @@
 """CBOR and CDDL validation utilities for SD-CWT."""
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional
 
 import cbor2
 import cbor_diag
@@ -13,10 +13,10 @@ class CBORValidator:
     @staticmethod
     def to_diagnostic(cbor_data: bytes) -> str:
         """Convert CBOR data to diagnostic notation.
-        
+
         Args:
             cbor_data: CBOR encoded bytes
-            
+
         Returns:
             Diagnostic notation string
         """
@@ -25,10 +25,10 @@ class CBORValidator:
     @staticmethod
     def from_diagnostic(diag_str: str) -> bytes:
         """Convert diagnostic notation to CBOR data.
-        
+
         Args:
             diag_str: Diagnostic notation string
-            
+
         Returns:
             CBOR encoded bytes
         """
@@ -37,10 +37,10 @@ class CBORValidator:
     @staticmethod
     def validate_structure(cbor_data: bytes) -> bool:
         """Validate CBOR structure.
-        
+
         Args:
             cbor_data: CBOR encoded bytes
-            
+
         Returns:
             True if valid CBOR structure
         """
@@ -53,7 +53,7 @@ class CBORValidator:
     @staticmethod
     def pretty_print(cbor_data: bytes) -> None:
         """Pretty print CBOR data in diagnostic notation.
-        
+
         Args:
             cbor_data: CBOR encoded bytes
         """
@@ -72,18 +72,18 @@ class CDDLValidator:
         payload: bstr .cbor sd-cwt-claims,
         signature: bstr
     ]
-    
+
     protected-header = {
         1: int,  ; alg
         18: int, ; sd_alg (header parameter 18)
         * int => any
     }
-    
+
     unprotected-header = {
         17: [* bstr],  ; sd_claims (header parameter 17)
         * int => any
     }
-    
+
     sd-cwt-claims = {
         1: tstr,  ; iss
         2: tstr,  ; sub
@@ -92,7 +92,7 @@ class CDDLValidator:
         * int => any,
         * tstr => any
     }
-    
+
     disclosure = [
         bstr,  ; salt
         any,   ; claim value
@@ -102,7 +102,7 @@ class CDDLValidator:
 
     def __init__(self, cddl_schema: Optional[str] = None):
         """Initialize CDDL validator.
-        
+
         Args:
             cddl_schema: Optional custom CDDL schema string
         """
@@ -120,17 +120,17 @@ class CDDLValidator:
 
     def validate(self, cbor_data: bytes, type_name: str = "sd-cwt") -> bool:
         """Validate CBOR data against CDDL schema.
-        
+
         Args:
             cbor_data: CBOR encoded data to validate
             type_name: CDDL type name to validate against
-            
+
         Returns:
             True if valid according to schema
         """
         if not self.validator:
             return False
-        
+
         try:
             self.validator.validate_cbor(cbor_data, type_name)
             return True
@@ -139,10 +139,10 @@ class CDDLValidator:
 
     def validate_disclosure(self, disclosure_cbor: bytes) -> bool:
         """Validate a disclosure array.
-        
+
         Args:
             disclosure_cbor: CBOR encoded disclosure array
-            
+
         Returns:
             True if valid disclosure format
         """
@@ -157,12 +157,12 @@ class SDCWTValidator:
         self.cbor_validator = CBORValidator()
         self.cddl_validator = CDDLValidator()
 
-    def validate_token(self, token: bytes) -> Dict[str, Any]:
+    def validate_token(self, token: bytes) -> dict[str, Any]:
         """Validate an SD-CWT token.
-        
+
         Args:
             token: CBOR encoded SD-CWT token
-            
+
         Returns:
             Validation results dictionary
         """
@@ -172,14 +172,14 @@ class SDCWTValidator:
             "cddl_valid": False,
             "has_redacted_claims": False,
             "has_sd_alg_header": False,
-            "errors": []
+            "errors": [],
         }
 
         # Check CBOR structure
         if not self.cbor_validator.validate_structure(token):
             results["errors"].append("Invalid CBOR structure")
             return results
-        
+
         results["cbor_valid"] = True
 
         # Check CDDL compliance
@@ -196,7 +196,7 @@ class SDCWTValidator:
                 payload = cbor2.loads(decoded[2])
                 protected_header = cbor2.loads(decoded[0]) if decoded[0] else {}
                 unprotected_header = decoded[1]
-                
+
                 # Check for redacted_claim_keys (simple value 59)
                 if 59 in payload:
                     results["has_redacted_claims"] = True
@@ -208,46 +208,42 @@ class SDCWTValidator:
                     results["has_sd_alg_header"] = True
                     if not isinstance(protected_header[18], int):
                         results["errors"].append("sd_alg (18) must be an integer")
-                        
+
                 # Check for sd_claims in unprotected header (header parameter 17)
-                if 17 in unprotected_header:
-                    if not isinstance(unprotected_header[17], list):
-                        results["errors"].append("sd_claims (17) must be an array")
+                if 17 in unprotected_header and not isinstance(unprotected_header[17], list):
+                    results["errors"].append("sd_claims (17) must be an array")
             else:
                 payload = decoded
+                # Check for redacted_claim_keys (simple value 59) in simple payload
+                if 59 in payload:
+                    results["has_redacted_claims"] = True
+                    if not isinstance(payload[59], list):
+                        results["errors"].append("redacted_claim_keys (59) must be an array")
 
         except Exception as e:
             results["errors"].append(f"Failed to parse token: {e}")
 
         # Set overall validity
-        results["valid"] = (
-            results["cbor_valid"] and
-            len(results["errors"]) == 0
-        )
+        results["valid"] = results["cbor_valid"] and len(results["errors"]) == 0
 
         return results
 
-    def validate_disclosure(self, disclosure: bytes) -> Dict[str, Any]:
+    def validate_disclosure(self, disclosure: bytes) -> dict[str, Any]:
         """Validate a disclosure array.
-        
+
         Args:
             disclosure: CBOR encoded disclosure
-            
+
         Returns:
             Validation results dictionary
         """
-        results = {
-            "valid": False,
-            "cbor_valid": False,
-            "format_valid": False,
-            "errors": []
-        }
+        results = {"valid": False, "cbor_valid": False, "format_valid": False, "errors": []}
 
         # Check CBOR structure
         if not self.cbor_validator.validate_structure(disclosure):
             results["errors"].append("Invalid CBOR structure")
             return results
-        
+
         results["cbor_valid"] = True
 
         # Check disclosure format
@@ -274,7 +270,7 @@ class SDCWTValidator:
 
     def print_diagnostic(self, token: bytes) -> None:
         """Print token in diagnostic notation.
-        
+
         Args:
             token: CBOR encoded token
         """
