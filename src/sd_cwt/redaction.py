@@ -223,7 +223,8 @@ def process_redactions(
         salt_generator: Optional custom salt generator (uses secure default if None)
 
     Returns:
-        Tuple of (redacted_claims, disclosures, hashes)
+        Tuple of (redacted_claims, disclosures, map_key_hashes)
+        map_key_hashes: Only the hashes for redacted map keys (for simple(59))
     """
     # Manual deep copy to handle CBOR tags
     def deep_copy_claims(obj: Any) -> Any:
@@ -239,7 +240,7 @@ def process_redactions(
 
     redacted_claims = deep_copy_claims(claims)
     disclosures = []
-    hashes = []
+    map_key_hashes = []  # Only for redacted map keys (goes into simple(59))
 
     # Sort paths by depth (deepest first) to avoid modifying parent before child
     sorted_paths = sorted(redacted_paths, key=lambda x: len(x[0]), reverse=True)
@@ -266,7 +267,7 @@ def process_redactions(
                 disclosures.append(disclosure)
 
                 hash_digest = hash_disclosure(disclosure)
-                hashes.append(hash_digest)
+                map_key_hashes.append(hash_digest)  # Map key hash goes to simple(59)
 
                 del container[claim_key]
             elif isinstance(parent, list) and isinstance(last_step, int):
@@ -278,11 +279,10 @@ def process_redactions(
                 disclosures.append(disclosure)
 
                 hash_digest = hash_disclosure(disclosure)
-                hashes.append(hash_digest)
+                # Array element hash does NOT go to simple(59) - it's replaced in-place with tag 60
 
-                # Remove the element from array (careful with indices)
-                # For now, replace with None and filter later
-                parent[last_step] = None
+                # Replace array element with tag 60 wrapped hash (per specification)
+                parent[last_step] = cbor_utils.create_tag(60, hash_digest)
         else:  # Top-level redaction
             if isinstance(redacted_claims, dict) and claim_key in redacted_claims:
                 salt = generate_salt(salt_generator=salt_generator)
@@ -292,42 +292,33 @@ def process_redactions(
                 disclosures.append(disclosure)
 
                 hash_digest = hash_disclosure(disclosure)
-                hashes.append(hash_digest)
+                map_key_hashes.append(hash_digest)  # Top-level map key hash goes to simple(59)
 
                 del redacted_claims[claim_key]
 
-    # Clean up None values from arrays
-    def clean_arrays(obj: Any) -> Any:
-        if isinstance(obj, dict):
-            return {k: clean_arrays(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [clean_arrays(item) for item in obj if item is not None]
-        else:
-            return obj
+    # No need to clean arrays - redacted elements are replaced with tag 60 hashes
 
-    redacted_claims = clean_arrays(redacted_claims)
-
-    return redacted_claims, disclosures, hashes
+    return redacted_claims, disclosures, map_key_hashes
 
 
 def build_sd_cwt_claims(
     claims: dict[Any, Any],
-    sd_hashes: list[bytes]
+    map_key_hashes: list[bytes]
 ) -> dict[Any, Any]:
-    """Build SD-CWT claims with redaction hashes.
+    """Build SD-CWT claims with redacted map key hashes.
 
     Args:
-        claims: Claims dictionary with redacted items removed
-        sd_hashes: List of disclosure hashes
+        claims: Claims dictionary with redacted items processed
+        map_key_hashes: List of hashes for redacted map keys only
 
     Returns:
-        SD-CWT claims dictionary with simple value 59 for hashes
+        SD-CWT claims dictionary with simple value 59 for map key hashes
     """
     sd_cwt_claims = claims.copy()
 
-    if sd_hashes:
-        # Use CBOR simple value 59 as the key for redacted claim hashes
-        sd_cwt_claims[cbor_utils.create_simple_value(59)] = sd_hashes
+    if map_key_hashes:
+        # Use CBOR simple value 59 as the key for redacted map key hashes only
+        sd_cwt_claims[cbor_utils.create_simple_value(59)] = map_key_hashes
 
     return sd_cwt_claims
 
@@ -359,12 +350,12 @@ def edn_to_redacted_cbor(
     redacted_paths = find_redacted_claims(claims)
 
     # Process redactions
-    redacted_claims, disclosures, hashes = process_redactions(
+    redacted_claims, disclosures, map_key_hashes = process_redactions(
         claims, redacted_paths, salt_generator
     )
 
     # Build SD-CWT claims
-    sd_cwt_claims = build_sd_cwt_claims(redacted_claims, hashes)
+    sd_cwt_claims = build_sd_cwt_claims(redacted_claims, map_key_hashes)
 
     # Encode to CBOR
     cbor_claims = cbor_utils.encode(sd_cwt_claims)
