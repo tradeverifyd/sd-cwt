@@ -138,20 +138,18 @@ class TestCBORExtendedDiagnosticNotation:
             1: "https://issuer.example.com",
             2: "user123",
             6: 1700000000,
-            "_sd": [
+            59: [  / redacted_claim_keys (simple value 59) /
                 h'aabbccdd11223344',
                 h'5566778899aabbcc'
-            ],
-            "_sd_alg": "sha-256"
+            ]
         }
         '''
         cbor_data = cbor_diag.diag2cbor(edn)
         
         decoded = cbor2.loads(cbor_data)
         assert decoded[1] == "https://issuer.example.com"
-        assert decoded["_sd_alg"] == "sha-256"
-        assert len(decoded["_sd"]) == 2
-        assert isinstance(decoded["_sd"][0], bytes)
+        assert len(decoded[59]) == 2  # redacted_claim_keys
+        assert isinstance(decoded[59][0], bytes)
     
     @pytest.mark.unit
     def test_edn_disclosure_array(self):

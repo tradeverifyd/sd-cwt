@@ -51,11 +51,10 @@ class TestCDDLValidation:
             1: "https://issuer.example.com",  # iss
             2: "user123",  # sub
             6: 1700000000,  # iat
-            "_sd": [
+            59: [  # redacted_claim_keys (simple value 59)
                 hashlib.sha256(b"disclosure1").digest(),
                 hashlib.sha256(b"disclosure2").digest(),
             ],
-            "_sd_alg": "sha-256",
         }
     
     @pytest.fixture
@@ -88,9 +87,8 @@ class TestCDDLValidation:
         # Basic validation - check structure
         decoded = cbor2.loads(cbor_data)
         assert 1 in decoded  # iss
-        assert "_sd" in decoded
-        assert "_sd_alg" in decoded
-        assert isinstance(decoded["_sd"], list)
+        assert 59 in decoded  # redacted_claim_keys
+        assert isinstance(decoded[59], list)
     
     @pytest.mark.unit
     def test_sd_cwt_with_standard_claims(self):
@@ -103,8 +101,7 @@ class TestCDDLValidation:
             5: 1700000000,  # nbf
             6: 1700000000,  # iat
             7: b"unique-id",  # cti
-            "_sd": [],
-            "_sd_alg": "sha-256",
+            59: [],  # redacted_claim_keys (empty array)
         }
         
         cbor_data = cbor2.dumps(claims)
@@ -344,8 +341,7 @@ class TestCDDLValidation:
         claims = {
             1: "issuer",
             2: "subject",
-            "_sd": [b"hash1", b"hash2"],
-            "_sd_alg": "sha-256",
+            59: [b"hash1", b"hash2"],  # redacted_claim_keys
             "...": True,  # Indicates more undisclosed claims exist
         }
         

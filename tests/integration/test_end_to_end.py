@@ -31,11 +31,10 @@ class TestEndToEnd:
                 # Remove from main claims (would be done by SD-CWT library)
                 del issuer_claims[claim_name]
         
-        issuer_claims["_sd"] = sd_claims
-        issuer_claims["_sd_alg"] = "sha-256"
+        issuer_claims[59] = sd_claims  # redacted_claim_keys (simple value 59)
         
-        assert "_sd" in issuer_claims
-        assert len(issuer_claims["_sd"]) == len(selective_disclosure_claims)
+        assert 59 in issuer_claims
+        assert len(issuer_claims[59]) == len(selective_disclosure_claims)
         
         # Step 2: Holder selects claims to disclose
         claims_to_disclose = ["given_name", "email"]
@@ -45,16 +44,14 @@ class TestEndToEnd:
         # In real implementation, would include only selected disclosures
         
         # Step 4: Verifier validates presentation
-        assert "_sd" in presentation_claims
-        assert "_sd_alg" in presentation_claims
+        assert 59 in presentation_claims
 
     @pytest.mark.integration
     def test_cbor_serialization_roundtrip(self, sample_claims: Dict[str, Any]):
         """Test CBOR serialization and deserialization."""
         # Add SD-specific claims
         claims = sample_claims.copy()
-        claims["_sd"] = ["hash1", "hash2", "hash3"]
-        claims["_sd_alg"] = "sha-256"
+        claims[59] = ["hash1", "hash2", "hash3"]  # redacted_claim_keys
         
         # Serialize to CBOR
         cbor_data = cbor2.dumps(claims)
@@ -65,8 +62,7 @@ class TestEndToEnd:
         
         # Verify all claims are preserved
         assert decoded_claims == claims
-        assert decoded_claims["_sd"] == claims["_sd"]
-        assert decoded_claims["_sd_alg"] == claims["_sd_alg"]
+        assert decoded_claims[59] == claims[59]
 
     @pytest.mark.integration
     def test_selective_disclosure_with_holder_binding(
@@ -173,10 +169,8 @@ class TestEndToEnd:
         decoded = cbor2.loads(mock_cwt_token)
         
         # Verify expected SD-CWT structure
-        assert "_sd" in decoded
-        assert "_sd_alg" in decoded
-        assert isinstance(decoded["_sd"], list)
-        assert decoded["_sd_alg"] == "sha-256"
+        assert 59 in decoded  # redacted_claim_keys
+        assert isinstance(decoded[59], list)
 
     @pytest.mark.integration
     def test_cose_key_operations(self, cose_key_pair):

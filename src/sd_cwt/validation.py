@@ -75,10 +75,12 @@ class CDDLValidator:
     
     protected-header = {
         1: int,  ; alg
+        18: int, ; sd_alg (header parameter 18)
         * int => any
     }
     
     unprotected-header = {
+        17: [* bstr],  ; sd_claims (header parameter 17)
         * int => any
     }
     
@@ -86,16 +88,15 @@ class CDDLValidator:
         1: tstr,  ; iss
         2: tstr,  ; sub
         6: int,   ; iat
-        "_sd": [* bstr],  ; selective disclosure digests
-        "_sd_alg": tstr,  ; hash algorithm
+        59: [* bstr],  ; redacted_claim_keys (simple value 59)
         * int => any,
         * tstr => any
     }
     
     disclosure = [
         bstr,  ; salt
-        tstr,  ; claim name
-        any    ; claim value
+        any,   ; claim value
+        (int / tstr)  ; claim key
     ]
     """
 
@@ -169,8 +170,8 @@ class SDCWTValidator:
             "valid": False,
             "cbor_valid": False,
             "cddl_valid": False,
-            "has_sd_claim": False,
-            "has_sd_alg": False,
+            "has_redacted_claims": False,
+            "has_sd_alg_header": False,
             "errors": []
         }
 
@@ -187,24 +188,33 @@ class SDCWTValidator:
         else:
             results["cddl_valid"] = True
 
-        # Check for SD-CWT specific claims
+        # Check for SD-CWT specific claims and headers
         try:
             decoded = cbor2.loads(token)
-            if isinstance(decoded, list) and len(decoded) >= 3:
-                # Extract payload from COSE structure
+            if isinstance(decoded, list) and len(decoded) >= 4:
+                # Extract payload and headers from COSE structure
                 payload = cbor2.loads(decoded[2])
+                protected_header = cbor2.loads(decoded[0]) if decoded[0] else {}
+                unprotected_header = decoded[1]
+                
+                # Check for redacted_claim_keys (simple value 59)
+                if 59 in payload:
+                    results["has_redacted_claims"] = True
+                    if not isinstance(payload[59], list):
+                        results["errors"].append("redacted_claim_keys (59) must be an array")
+
+                # Check for sd_alg in protected header (header parameter 18)
+                if 18 in protected_header:
+                    results["has_sd_alg_header"] = True
+                    if not isinstance(protected_header[18], int):
+                        results["errors"].append("sd_alg (18) must be an integer")
+                        
+                # Check for sd_claims in unprotected header (header parameter 17)
+                if 17 in unprotected_header:
+                    if not isinstance(unprotected_header[17], list):
+                        results["errors"].append("sd_claims (17) must be an array")
             else:
                 payload = decoded
-
-            if "_sd" in payload:
-                results["has_sd_claim"] = True
-                if not isinstance(payload["_sd"], list):
-                    results["errors"].append("_sd claim must be an array")
-
-            if "_sd_alg" in payload:
-                results["has_sd_alg"] = True
-                if not isinstance(payload["_sd_alg"], str):
-                    results["errors"].append("_sd_alg must be a string")
 
         except Exception as e:
             results["errors"].append(f"Failed to parse token: {e}")
@@ -212,8 +222,6 @@ class SDCWTValidator:
         # Set overall validity
         results["valid"] = (
             results["cbor_valid"] and
-            results["has_sd_claim"] and
-            results["has_sd_alg"] and
             len(results["errors"]) == 0
         )
 
@@ -250,12 +258,12 @@ class SDCWTValidator:
             elif len(decoded) != 3:
                 results["errors"].append("Disclosure must have exactly 3 elements")
             else:
-                # Check element types
+                # Check element types for SD-CWT format: [salt, value, key]
                 if not isinstance(decoded[0], bytes):
                     results["errors"].append("First element (salt) must be bytes")
-                if not isinstance(decoded[1], str):
-                    results["errors"].append("Second element (claim name) must be string")
-                # Third element can be any type
+                # Second element (value) can be any type
+                if not isinstance(decoded[2], (str, int)):
+                    results["errors"].append("Third element (claim key) must be string or int")
                 results["format_valid"] = len(results["errors"]) == 0
 
         except Exception as e:

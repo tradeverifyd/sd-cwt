@@ -88,9 +88,10 @@ class SDCWTIssuer:
             claim_value: Value of the claim
             
         Returns:
-            CBOR-encoded disclosure array [salt, claim_name, claim_value]
+            CBOR-encoded disclosure array [salt, value, key] (SD-CWT format)
         """
-        disclosure_array = [salt, claim_name, claim_value]
+        # SD-CWT format: [salt, value, key] (different from SD-JWT [salt, key, value])
+        disclosure_array = [salt, claim_value, claim_name]
         return cbor2.dumps(disclosure_array)
     
     def hash_disclosure(self, disclosure: bytes) -> bytes:
@@ -150,8 +151,9 @@ class SDCWTIssuer:
         
         # Create SD-CWT claims
         sd_cwt_claims = all_claims.copy()
-        sd_cwt_claims["_sd"] = sd_hashes
-        sd_cwt_claims["_sd_alg"] = self.hash_alg
+        # Use CBOR simple value 59 for redacted claim keys (not "_sd")
+        if sd_hashes:
+            sd_cwt_claims[59] = sd_hashes  # simple(59) for redacted_claim_keys
         
         # Add holder binding if provided
         if holder_key:

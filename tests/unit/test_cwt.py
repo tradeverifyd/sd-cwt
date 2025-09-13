@@ -94,21 +94,18 @@ class TestCWT:
             1: "https://issuer.example",  # iss
             2: "https://device.example",  # sub
             6: 1725244200,               # iat
-            "_sd": [                     # SD hashes
+            59: [                        # redacted_claim_keys (simple value 59)
                 b'\x12\x34\x56\x78' * 8,  # 32 bytes hash
                 b'\xab\xcd\xef\x00' * 8,  # 32 bytes hash
             ],
-            "_sd_alg": "sha-256"         # Hash algorithm
         }
         
-        assert "_sd" in sd_claims
-        assert "_sd_alg" in sd_claims
-        assert isinstance(sd_claims["_sd"], list)
-        assert len(sd_claims["_sd"]) == 2
-        assert sd_claims["_sd_alg"] == "sha-256"
+        assert 59 in sd_claims  # redacted_claim_keys (simple value 59)
+        assert isinstance(sd_claims[59], list)
+        assert len(sd_claims[59]) == 2
         
         # Verify hashes are 32 bytes (SHA-256)
-        for hash_val in sd_claims["_sd"]:
+        for hash_val in sd_claims[59]:
             assert len(hash_val) == 32
 
     @pytest.mark.unit

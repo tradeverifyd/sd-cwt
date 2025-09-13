@@ -15,8 +15,8 @@
         "algorithm": "ES256"
       },
       "expected": {
-        "has_sd_claim": true,
-        "sd_alg": "sha-256",
+        "has_redacted_claims": true,
+        "sd_alg_header": "sha-256",
         "num_disclosures": 3
       }
     },
@@ -37,8 +37,8 @@
         "algorithm": "ES256"
       },
       "expected": {
-        "has_sd_claim": true,
-        "sd_alg": "sha-256",
+        "has_redacted_claims": true,
+        "sd_alg_header": "sha-256",
         "num_disclosures": 1
       }
     },
@@ -56,8 +56,8 @@
         "algorithm": "ES256"
       },
       "expected": {
-        "has_sd_claim": true,
-        "sd_alg": "sha-256",
+        "has_redacted_claims": true,
+        "sd_alg_header": "sha-256",
         "num_disclosures": 2
       }
     }

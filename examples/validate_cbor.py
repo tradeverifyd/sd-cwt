@@ -32,8 +32,7 @@ def create_sample_sd_cwt():
         "sub": "user123",
         "iat": 1700000000,
         "email": "alice@example.com",  # Not selectively disclosed
-        "_sd": [hash1, hash2],
-        "_sd_alg": "sha-256"
+        59: [hash1, hash2]  # redacted_claim_keys (simple value 59)
     }
     
     return cbor2.dumps(claims), [disclosure1, disclosure2]
@@ -89,8 +88,8 @@ def demonstrate_sd_cwt_validation():
     results = validator.validate_token(token)
     print(f"   Overall valid: {results['valid']}")
     print(f"   CBOR valid: {results['cbor_valid']}")
-    print(f"   Has _sd claim: {results['has_sd_claim']}")
-    print(f"   Has _sd_alg claim: {results['has_sd_alg']}")
+    print(f"   Has redacted claims: {results['has_redacted_claims']}")
+    print(f"   Has sd_alg header: {results['has_sd_alg_header']}")
     if results['errors']:
         print(f"   Errors: {results['errors']}")
     
@@ -117,7 +116,7 @@ def demonstrate_cbor_diag():
         1: "issuer",  # Using integer keys like in CWT
         2: "subject",
         6: 1700000000,
-        "_sd": [
+        59: [  # redacted_claim_keys (simple value 59)
             base64.b64decode("aGFzaDEK"),  # Binary data
             base64.b64decode("aGFzaDIK"),
         ],

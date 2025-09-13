@@ -1,52 +1,120 @@
 """CDDL schemas for SD-CWT and COSE Key Thumbprint specifications."""
 
-# SD-CWT CDDL Schema based on draft-ietf-spice-sd-cwt-04
+# SD-CWT CDDL Schema - Exact specification from draft-ietf-spice-sd-cwt-04 Appendix A
 SD_CWT_CDDL = """
-; SD-CWT CDDL Schema (draft-ietf-spice-sd-cwt-04)
+; Complete CDDL Schema from draft-ietf-spice-sd-cwt-04 Appendix A
 
-; Main SD-CWT structure (COSE Sign1)
-sd-cwt = #6.18(COSE_Sign1)
+sd-cwt-types = sd-cwt-issued / kbt-cwt
 
-COSE_Sign1 = [
-    protected: bstr .cbor protected-header,
-    unprotected: unprotected-header,
-    payload: bstr .cbor sd-cwt-claims,
-    signature: bstr
+sd-cwt-issued = #6.18([
+   protected: bstr .cbor sd-protected,
+   sd-unprotected,
+   payload: bstr .cbor sd-payload,
+   signature: bstr
+])
+
+kbt-cwt = #6.18([
+   protected: bstr .cbor kbt-protected,
+   kbt-unprotected,
+   payload: bstr .cbor kbt-payload,
+   signature: bstr
+])
+
+sd-protected = {
+   &(typ: 16) ^ => "application/sd-cwt" / TBD11,
+   &(alg: 1) ^ => int,
+   &(sd_alg: TBD2) ^ => int,        ; -16 for sha-256
+   ? &(sd_aead: TBD7) ^ => uint .size 2
+   * key => any
+}
+
+kbt-protected = {
+   &(typ: 16) ^ => "application/kb+cwt" / TBD12,
+   &(alg: 1) ^ => int,
+   &(kcwt: 13) ^ => sd-cwt-issued,
+   * key => any
+}
+
+sd-unprotected = {
+   ? &(sd_claims: TBD1) ^ => salted-array,
+   ? &(sd_aead_encrypted_claims: TBD6) ^ => aead-encrypted-array,
+   * key => any
+}
+
+kbt-unprotected = {
+   * key => any
+}
+
+sd-payload = {
+    ; standard claims
+      &(iss: 1) ^ => tstr, ; "https://issuer.example"
+    ? &(sub: 2) ^ => tstr, ; "https://device.example"
+    ? &(aud: 3) ^ => tstr, ; "https://verifier.example/app"
+    ? &(exp: 4) ^ => int,  ; 1883000000
+    ? &(nbf: 5) ^ => int,  ; 1683000000
+    ? &(iat: 6) ^ => int,  ; 1683000000
+    ? &(cti: 7) ^ => bstr,
+      &(cnf: 8) ^ => { * key => any }, ; key confirmation
+    ? &(cnonce: 39) ^ => bstr,
+    ;
+    ? &(redacted_claim_keys: REDACTED_KEYS) ^ => [ * bstr ],
+    * key => any
+}
+
+kbt-payload = {
+      &(aud: 3) ^ => tstr, ; "https://verifier.example/app"
+    ? &(exp: 4) ^ => int,  ; 1883000000
+    ? &(nbf: 5) ^ => int,  ; 1683000000
+      &(iat: 6) ^ => int,  ; 1683000000
+    ? &(cnonce: 39) ^ => bstr,
+    * key => any
+}
+
+salted-array = [ +bstr .cbor salted ]
+salted = salted-claim / salted-element / decoy
+salted-claim = [
+  bstr .size 16,     ; 128-bit salt
+  any,               ; claim value
+  (int / text)       ; claim name
+]
+salted-element = [
+  bstr .size 16,     ; 128-bit salt
+  any                ; claim value
+]
+decoy = [
+  bstr .size 16      ; 128-bit salt
 ]
 
-; Protected header must include algorithm
-protected-header = {
-    1 => int,  ; alg
-    * int => any
-}
+aead-encrypted-array = [ +aead-encrypted ]
+aead-encrypted = [
+  bstr .size 16,     ; 128-bit nonce
+  bstr,              ; the encryption ciphertext output of a
+                     ;   bstr-encoded-salted
+  bstr               ; the corresponding authentication tag
+]
 
-; Unprotected header
-unprotected-header = {
-    * int => any
+header_map = {
+    * key => any
 }
+empty_or_serialized_map = bstr .cbor header_map / bstr .size 0
 
-; SD-CWT Claims
-sd-cwt-claims = {
-    ; Standard CWT claims (using integer keys)
-    ? 1 => tstr,  ; iss (issuer)
-    ? 2 => tstr,  ; sub (subject)
-    ? 3 => tstr,  ; aud (audience)
-    ? 4 => int,   ; exp (expiration time)
-    ? 5 => int,   ; nbf (not before)
-    ? 6 => int,   ; iat (issued at)
-    ? 7 => bstr,  ; cti (CWT ID)
-    
-    ; SD-CWT specific claims
-    "_sd" => [* bstr],        ; Selective disclosure digests
-    ? "_sd_alg" => tstr,      ; Hash algorithm (default: sha-256)
-    ? "..." => bool,          ; Indicates undisclosed claims exist
-    
-    ; Confirmation claim for holder binding
-    ? 8 => cnf,  ; cnf (confirmation)
-    
-    ; Additional claims
-    * (int / tstr) => any
-}
+key = int / text
+TBD1 = 17
+TBD2 = 18
+TBD6 = 19
+TBD7 = 20
+TBD11 = 298
+TBD12 = 299
+
+; REDACTED_KEYS is to be used in CDDL payloads that are meant to
+; convey that a map key is redacted.
+REDACTED_KEYS = #7.59  ; #7.<TBD4>
+;TBD4 = 59          ; for CBOR simple value 59
+
+; redacted_claim_element is to be used in CDDL payloads that contain
+; array elements that are meant to be redacted.
+redacted_claim_element = #6.60( bstr .size 16 )  ; #6.<TBD5>(bstr)
+;TBD5 = 60; CBOR tag wrapping redacted_claim_element
 
 ; Confirmation methods
 cnf = {

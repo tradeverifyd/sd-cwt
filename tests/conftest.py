@@ -142,8 +142,7 @@ def mock_cwt_token() -> bytes:
         "iss": "test-issuer",
         "sub": "test-subject",
         "iat": 1234567890,
-        "_sd": ["hash1", "hash2", "hash3"],  # Selective disclosure hashes
-        "_sd_alg": "sha-256",
+        59: ["hash1", "hash2", "hash3"],  # redacted_claim_keys (simple value 59)
     }
     return cbor2.dumps(mock_payload)
 

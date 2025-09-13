@@ -25,11 +25,10 @@ def demonstrate_cbor_edn():
         1: "https://issuer.example.com",  / iss /
         2: "user123",                      / sub /
         6: 1700000000,                     / iat /
-        "_sd": [
+        59: [
             h'496bd8afadf307e5b08c64b81e87f36a3e6fca2b7c5c401b6d1e2c0d8e1b1a6f',
             h'7c5c401b6d1e2c0d8e1b1a6f496bd8afadf307e5b08c64b81e87f36a3e6fca2b'
-        ],
-        "_sd_alg": "sha-256"
+        ]  / redacted_claim_keys (simple value 59) /
     }
     '''
     
@@ -63,13 +62,13 @@ def demonstrate_cbor_edn():
     
     # 3. Disclosure Array in EDN
     print("\n3. Disclosure Array in EDN:")
-    disclosure_edn = '[h\'73616c74\', "given_name", "John"]'
+    disclosure_edn = '[h\'73616c74\', "John", "given_name"]'  # SD-CWT format: [salt, value, key]
     
     print(f"  EDN: {disclosure_edn}")
     
     disclosure_cbor = cbor_diag.diag2cbor(disclosure_edn)
     decoded = cbor2.loads(disclosure_cbor)
-    print(f"  Decoded: [{decoded[0]!r}, {decoded[1]!r}, {decoded[2]!r}]")
+    print(f"  Decoded: [salt={decoded[0]!r}, value={decoded[1]!r}, key={decoded[2]!r}]")
 
 
 def demonstrate_cddl_validation():
@@ -83,19 +82,17 @@ def demonstrate_cddl_validation():
         1: "https://issuer.example.com",  # iss
         2: "user123",  # sub
         6: 1700000000,  # iat
-        "_sd": [
+        59: [  # redacted_claim_keys (simple value 59)
             hashlib.sha256(b"disclosure1").digest(),
             hashlib.sha256(b"disclosure2").digest(),
         ],
-        "_sd_alg": "sha-256",
     }
     
     print("\n1. SD-CWT Claims Structure:")
     print(f"   Issuer: {claims[1]}")
     print(f"   Subject: {claims[2]}")
     print(f"   Issued At: {claims[6]}")
-    print(f"   SD Hashes: {len(claims['_sd'])} hashes")
-    print(f"   SD Algorithm: {claims['_sd_alg']}")
+    print(f"   Redacted Claim Keys: {len(claims[59])} hashes")
     
     # Convert to CBOR
     cbor_data = cbor2.dumps(claims)
@@ -256,7 +253,7 @@ def demonstrate_real_world_example():
     for claim_name in sd_claims:
         if claim_name in all_claims:
             salt = hashlib.sha256(f"salt_{claim_name}".encode()).digest()[:16]
-            disclosure = [salt, claim_name, all_claims[claim_name]]
+            disclosure = [salt, all_claims[claim_name], claim_name]  # SD-CWT format: [salt, value, key]
             disclosures.append(disclosure)
             
             # Hash the disclosure
@@ -269,14 +266,13 @@ def demonstrate_real_world_example():
         1: all_claims["iss"],  # iss
         2: all_claims["sub"],  # sub
         6: all_claims["iat"],  # iat
-        "_sd": sd_hashes,
-        "_sd_alg": "sha-256",
+        59: sd_hashes,  # redacted_claim_keys (simple value 59)
     }
     
     print(f"\n2. SD-CWT Claims (after removing {len(sd_claims)} claims):")
     print(f"   Issuer: {sd_cwt_claims[1]}")
     print(f"   Subject: {sd_cwt_claims[2]}")
-    print(f"   SD Hashes: {len(sd_cwt_claims['_sd'])} hashes")
+    print(f"   Redacted Claim Keys: {len(sd_cwt_claims[59])} hashes")
     
     print("\n3. Disclosures Created:")
     for i, disclosure in enumerate(disclosures):

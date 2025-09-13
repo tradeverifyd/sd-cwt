@@ -232,9 +232,7 @@ class TestSDCWTIssuer:
         assert 1 in payload  # iss
         assert 2 in payload  # sub
         assert 6 in payload  # iat
-        assert "_sd" in payload
-        assert "_sd_alg" in payload
-        assert payload["_sd_alg"] == "sha-256"
+        assert 59 in payload  # redacted_claim_keys (simple value 59)
     
     @pytest.mark.unit
     def test_cbor_tag_handling(self, issuer: SDCWTIssuer):

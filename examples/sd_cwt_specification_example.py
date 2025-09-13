@@ -243,8 +243,7 @@ def demonstrate_disclosure_creation():
         2: "https://device.example",
         6: 1725244200,
         501: "ABCD-123456",  # This claim remains visible
-        "_sd": [disc["hash"] for disc in disclosures],
-        "_sd_alg": "sha-256"
+        59: [disc["hash"] for disc in disclosures],  # redacted_claim_keys
     }
     
     edn = cbor_diag.cbor2diag(cbor2.dumps(sd_cwt_claims))
@@ -278,7 +277,7 @@ def demonstrate_presentation():
     print("   ✓ Verify SD-CWT signature")
     print("   ✓ Check timestamp claims (exp, nbf, iat)")  
     print("   ✓ Decode provided disclosures")
-    print("   ✓ Hash disclosures and match against _sd array")
+    print("   ✓ Hash disclosures and match against redacted_claim_keys")
     print("   ✓ Construct verified claims")
 
 

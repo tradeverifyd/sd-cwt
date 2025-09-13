@@ -63,7 +63,7 @@ class TestCDDLValidator:
         """Test CDDL validator initialization."""
         validator = CDDLValidator()
         assert validator.schema is not None
-        assert "_sd" in validator.schema
+        assert "59" in validator.schema or "redacted_claim_keys" in validator.schema
         assert "disclosure" in validator.schema
 
     @pytest.mark.unit
@@ -81,7 +81,7 @@ class TestCDDLValidator:
     @pytest.mark.unit
     def test_validate_disclosure_format(self):
         """Test validating disclosure array format."""
-        disclosure = [b"salt123", "claim_name", "claim_value"]
+        disclosure = [b"salt123", "claim_value", "claim_name"]  # SD-CWT format: [salt, value, key]
         disclosure_cbor = cbor2.dumps(disclosure)
         
         validator = CDDLValidator()
@@ -102,14 +102,14 @@ class TestSDCWTValidator:
         
         assert isinstance(results, dict)
         assert "cbor_valid" in results
-        assert "has_sd_claim" in results
-        assert "has_sd_alg" in results
+        assert "has_redacted_claims" in results
+        assert "has_sd_alg_header" in results
         assert "errors" in results
         
         # Mock token should be valid CBOR
         assert results["cbor_valid"] is True
-        assert results["has_sd_claim"] is True
-        assert results["has_sd_alg"] is True
+        assert results["has_redacted_claims"] is True
+        assert results["has_sd_alg_header"] is True
 
     @pytest.mark.unit
     def test_validate_invalid_token(self):
@@ -137,14 +137,14 @@ class TestSDCWTValidator:
         results = validator.validate_token(token_without_sd)
         
         assert results["cbor_valid"] is True
-        assert results["has_sd_claim"] is False
-        assert results["has_sd_alg"] is False
+        assert results["has_redacted_claims"] is False
+        assert results["has_sd_alg_header"] is False
         assert results["valid"] is False
 
     @pytest.mark.unit
     def test_validate_disclosure(self):
         """Test validating disclosure array."""
-        valid_disclosure = [b"salt", "name", "value"]
+        valid_disclosure = [b"salt", "value", "name"]  # SD-CWT format: [salt, value, key]
         disclosure_cbor = cbor2.dumps(valid_disclosure)
         
         validator = SDCWTValidator()
