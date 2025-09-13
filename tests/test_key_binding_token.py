@@ -209,14 +209,14 @@ class TestKeyBindingToken:
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
         presentation_verifier = PresentationVerifier(holder_key_dict)
 
-        # Verify KBT signature
-        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt)
+        # Verify KBT signature with audience validation
+        expected_audience = "https://verifier.example/api"
+        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
         assert is_valid, "KBT signature should verify successfully"
         assert kbt_payload is not None, "Verified payload should not be None"
 
         # Verify payload contents
-        audience = "https://verifier.example/api"
-        assert kbt_payload[3] == audience, "Verified payload should contain audience"
+        assert kbt_payload[3] == expected_audience, "Verified payload should contain audience"
         assert kbt_payload[6] is not None, "Verified payload should contain iat"
 
     def test_complete_kbt_workflow(self):
@@ -262,11 +262,12 @@ class TestKeyBindingToken:
         is_valid, extracted_info = validate_sd_kbt_structure(sd_kbt)
         assert is_valid, "KBT should have valid structure"
 
-        # Step 5: Verify KBT signature
+        # Step 5: Verify KBT signature with audience validation
+        expected_audience = "https://verifier.example/api"
         presentation_verifier = PresentationVerifier(holder_key_dict)
-        is_valid, verified_payload = presentation_verifier.verify(sd_kbt)
+        is_valid, verified_payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
         assert is_valid and verified_payload is not None
-        assert verified_payload[3] == "https://verifier.example/api"
+        assert verified_payload[3] == expected_audience
 
     def test_kbt_without_cnonce(self):
         """Test KBT creation without optional cnonce."""
@@ -332,9 +333,10 @@ class TestKeyBindingToken:
         is_valid, extracted_info = validate_sd_kbt_structure(sd_kbt)
         assert is_valid, "KBT with thumbprint cnf should be valid"
 
-        # Verify KBT signature with holder key
+        # Verify KBT signature with holder key and audience validation
+        expected_audience = "https://verifier.example"
         presentation_verifier = PresentationVerifier(holder_key_dict)
-        is_valid, payload = presentation_verifier.verify(sd_kbt)
+        is_valid, payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
         assert is_valid and payload is not None, "KBT signature should verify"
 
     def test_complete_verification_chain(self):
@@ -368,17 +370,60 @@ class TestKeyBindingToken:
             cnonce=b"verification-chain-nonce"
         )
 
-        # Step 5: Verify holder-signed KBT with extracted presentation verifier
-        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt)
-        assert is_valid, "KBT signature should verify with extracted presentation verifier"
+        # Step 5: Verify holder-signed KBT with audience validation
+        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt, audience=expected_audience)
+        assert is_valid, "KBT signature should verify with correct audience"
         assert kbt_payload is not None, "KBT payload should not be None"
 
-        # Step 6: Confirm audience is correct in verified KBT payload
+        # Step 6: Verify audience was correctly validated during verification
         actual_audience = kbt_payload[3]  # aud claim
         assert actual_audience == expected_audience, (
-            f"Audience mismatch: expected {expected_audience}, got {actual_audience}"
+            f"Audience should match: expected {expected_audience}, got {actual_audience}"
         )
 
         # Additional verification: ensure KBT contains the original SD-CWT
         is_valid, _ = validate_sd_kbt_structure(sd_kbt)
         assert is_valid, "KBT structure should be valid"
+
+    def test_presentation_verifier_audience_validation(self):
+        """Test that PresentationVerifier validates audience correctly."""
+        # Create SD-CWT and KBT
+        sd_cwt_data = self._create_test_sd_cwt()
+        sd_cwt, issuer_key_cbor, holder_key_cbor = sd_cwt_data
+
+        # Create presentation verifier
+        issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
+        credential_verifier = CredentialVerifier(issuer_key_dict)
+        presentation_verifier = get_presentation_verifier(sd_cwt, credential_verifier)
+        assert presentation_verifier is not None
+
+        # Create KBT with specific audience
+        holder_key_dict = cbor_utils.decode(holder_key_cbor)
+        holder_signer = PresentationSigner(holder_key_dict)
+
+        correct_audience = "https://verifier.example/correct"
+        sd_kbt = create_sd_kbt(
+            sd_cwt_with_disclosures=sd_cwt,
+            holder_signer=holder_signer,
+            audience=correct_audience,
+            issued_at=int(time.time()),
+            cnonce=b"audience-test-nonce"
+        )
+
+        # Test 1: Verification should succeed with correct audience
+        is_valid, payload = presentation_verifier.verify(sd_kbt, audience=correct_audience)
+        assert is_valid, "Verification should succeed with correct audience"
+        assert payload is not None
+        assert payload[3] == correct_audience
+
+        # Test 2: Verification should fail with wrong audience
+        wrong_audience = "https://verifier.example/wrong"
+        is_valid, payload = presentation_verifier.verify(sd_kbt, audience=wrong_audience)
+        assert not is_valid, "Verification should fail with wrong audience"
+        assert payload is None
+
+        # Test 3: Verification should succeed without audience parameter (no validation)
+        is_valid, payload = presentation_verifier.verify(sd_kbt)
+        assert is_valid, "Verification should succeed without audience validation"
+        assert payload is not None
+        assert payload[3] == correct_audience

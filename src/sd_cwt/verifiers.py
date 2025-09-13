@@ -5,7 +5,7 @@ This module provides safe verifier classes for SD-CWT verification:
 - PresentationVerifier: Verifies KBT presentations using holder's key
 """
 
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 from . import cbor_utils
 from .cose_sign1 import ES256Verifier, cose_sign1_verify
@@ -23,7 +23,7 @@ class CredentialVerifier:
         self.issuer_key = issuer_cose_key
         self._verifier = ES256Verifier(issuer_cose_key[-2], issuer_cose_key[-3])
 
-    def verify(self, sd_cwt: bytes) -> Tuple[bool, Optional[dict[int, Any]]]:
+    def verify(self, sd_cwt: bytes) -> tuple[bool, Optional[dict[int, Any]]]:
         """Verify SD-CWT credential signature.
 
         Args:
@@ -51,18 +51,30 @@ class PresentationVerifier:
         self.holder_key = holder_cose_key
         self._verifier = ES256Verifier(holder_cose_key[-2], holder_cose_key[-3])
 
-    def verify(self, kbt: bytes) -> Tuple[bool, Optional[dict[int, Any]]]:
-        """Verify KBT presentation signature.
+    def verify(self, kbt: bytes, audience: Optional[str] = None) -> tuple[bool, Optional[dict[int, Any]]]:
+        """Verify KBT presentation signature and optionally validate audience.
 
         Args:
             kbt: CBOR-encoded Key Binding Token
+            audience: Expected audience value to validate against KBT's aud claim
 
         Returns:
             Tuple of (is_valid, payload_dict) where payload_dict contains KBT claims
+
+        Note:
+            If audience is provided, verification will fail if the KBT's audience
+            claim (field 3) doesn't match the expected value.
         """
         is_valid, payload_bytes = cose_sign1_verify(kbt, self._verifier)
         if is_valid and payload_bytes:
             payload = cbor_utils.decode(payload_bytes)
+
+            # If audience is specified, validate it matches the KBT's aud claim
+            if audience is not None:
+                kbt_audience = payload.get(3)  # aud claim
+                if kbt_audience != audience:
+                    return False, None
+
             return True, payload
         return False, None
 
@@ -103,3 +115,4 @@ def get_presentation_verifier(
 
     # Create and return presentation verifier
     return PresentationVerifier(holder_key)
+
