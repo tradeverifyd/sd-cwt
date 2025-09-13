@@ -4,6 +4,7 @@ from . import cbor_utils
 from typing import Any, Optional
 
 from . import cddl_utils, edn_utils
+from .cddl_schemas import COMBINED_CDDL
 
 
 class CBORValidator:
@@ -63,39 +64,33 @@ class CBORValidator:
 class CDDLValidator:
     """Utility class for CDDL schema validation."""
 
-    # SD-CWT CDDL schema based on draft-ietf-spice-sd-cwt-04
-    SD_CWT_CDDL = """
+    # Simplified CDDL schema for zcbor compatibility
+    SIMPLE_CDDL = """
+    ; Basic COSE Key schema (zcbor-compatible)
+    cose-key = {
+        1: int,      ; kty (key type) - required
+        ? 2: bstr,   ; kid (key ID) - optional
+        ? 3: int,    ; alg (algorithm) - optional
+        ? -1: int,   ; crv (curve) - for EC keys
+        ? -2: bstr,  ; x coordinate - for EC keys
+        ? -3: bstr,  ; y coordinate - for EC2 keys
+        ? -4: bstr,  ; d (private key) - for private keys
+        * int => any
+    }
+
+    ; SD-CWT schema (simplified)
     sd-cwt = [
-        protected: bstr .cbor protected-header,
-        unprotected: unprotected-header,
-        payload: bstr .cbor sd-cwt-claims,
-        signature: bstr
+        bstr,  ; protected header
+        {},    ; unprotected header
+        bstr,  ; payload
+        bstr   ; signature
     ]
 
-    protected-header = {
-        1: int,  ; alg
-        18: int, ; sd_alg (header parameter 18)
-        * int => any
-    }
-
-    unprotected-header = {
-        17: [* bstr],  ; sd_claims (header parameter 17)
-        * int => any
-    }
-
-    sd-cwt-claims = {
-        1: tstr,  ; iss
-        2: tstr,  ; sub
-        6: int,   ; iat
-        59: [* bstr],  ; redacted_claim_keys (simple value 59)
-        * int => any,
-        * tstr => any
-    }
-
+    ; Disclosure schema
     disclosure = [
-        bstr,  ; salt
-        any,   ; claim value
-        (int / tstr)  ; claim key
+        bstr,        ; salt
+        any,         ; claim value
+        (int / tstr) ; claim key
     ]
     """
 
@@ -105,7 +100,7 @@ class CDDLValidator:
         Args:
             cddl_schema: Optional custom CDDL schema string
         """
-        self.schema = cddl_schema or self.SD_CWT_CDDL
+        self.schema = cddl_schema or self.SIMPLE_CDDL
         self.validator = cddl_utils.create_validator(self.schema)
 
     def validate(self, cbor_data: bytes, type_name: str = "sd-cwt") -> bool:
