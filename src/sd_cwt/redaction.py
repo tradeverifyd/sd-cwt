@@ -8,8 +8,8 @@ from . import cbor_utils, edn_utils
 
 
 # CBOR tags for redaction (from SD-CWT spec)
-REDACTED_CLAIM_KEY_TAG = 59  # Simple value for redacted claim keys
-REDACTED_CLAIM_ELEMENT_TAG = 60  # Tag for redacted array elements
+REDACTED_CLAIM_KEY_TAG = 58  # Tag for to-be-redacted claim keys in EDN
+REDACTED_CLAIM_ELEMENT_TAG = 58  # Tag for to-be-redacted array elements in EDN
 
 
 class SaltGenerator(Protocol):

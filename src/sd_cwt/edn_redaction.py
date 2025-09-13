@@ -16,8 +16,8 @@ class EDNRedactionParser:
     """Parser for EDN with redaction tags."""
 
     # Redaction tags from specification
-    REDACTED_CLAIM_KEY_TAG = 59  # TBD4 - requested value 59
-    REDACTED_CLAIM_ELEMENT_TAG = 60  # Tag 60
+    REDACTED_CLAIM_KEY_TAG = 58  # TBD3 - tag for to-be-redacted keys
+    REDACTED_CLAIM_ELEMENT_TAG = 58  # TBD3 - tag for to-be-redacted array elements
 
     def __init__(self) -> None:
         """Initialize EDN redaction parser."""

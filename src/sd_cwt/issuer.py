@@ -20,8 +20,8 @@ class SDCWTIssuer:
     """SD-CWT issuer that creates selective disclosure tokens using EDN."""
 
     # CBOR tags for redaction (from latest spec)
-    REDACTED_CLAIM_KEY_TAG = 59  # TBD4 - requested value 59
-    REDACTED_CLAIM_ELEMENT_TAG = 60  # Tag 60
+    REDACTED_CLAIM_KEY_TAG = 58  # TBD3 - tag for to-be-redacted keys
+    REDACTED_CLAIM_ELEMENT_TAG = 58  # TBD3 - tag for to-be-redacted array elements
 
     def __init__(self, signing_key: CoseKey, issuer: str):
         """Initialize SD-CWT issuer.
