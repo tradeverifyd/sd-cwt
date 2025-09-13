@@ -14,10 +14,14 @@ from .cose_sign1 import (
     cose_sign1_sign,
     cose_sign1_verify,
 )
+from .redaction import (
+    edn_to_redacted_cbor,
+)
 
 # Hide module imports
 del cose_keys
 del cose_sign1
+del redaction
 
 __version__ = "0.1.0"
 
@@ -38,4 +42,6 @@ __all__ = [
     "cose_key_thumbprint",
     # Algorithm enumeration (needed for key generation)
     "CoseAlgorithm",
+    # EDN Redaction
+    "edn_to_redacted_cbor",
 ]
