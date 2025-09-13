@@ -1,3 +1,4 @@
+from sd_cwt import edn_utils
 #!/usr/bin/env python3
 """SD-CWT example matching the latest specification exactly.
 
@@ -10,7 +11,6 @@ import secrets
 from typing import Dict, Any
 
 import cbor2
-import cbor_diag
 from fido2.cose import CoseKey
 
 from sd_cwt.issuer import SDCWTIssuer, create_example_edn_claims
@@ -86,7 +86,7 @@ def demonstrate_specification_example():
     }
     '''
     
-    cbor_data = cbor_diag.diag2cbor(clean_spec)
+    cbor_data = edn_utils.diag_to_cbor(clean_spec)
     claims = cbor2.loads(cbor_data)
     
     print(f"   Issuer (1): {claims[1]}")
@@ -233,7 +233,7 @@ def demonstrate_disclosure_creation():
     # Show EDN representation of disclosures
     print("\n2. Disclosure Arrays in EDN:")
     for disc in disclosures:
-        edn = cbor_diag.cbor2diag(disc["disclosure"])
+        edn = edn_utils.cbor_to_diag(disc["disclosure"])
         print(f"   {disc['name']}: {edn}")
     
     # Create SD-CWT claims with hashes
@@ -246,7 +246,7 @@ def demonstrate_disclosure_creation():
         59: [disc["hash"] for disc in disclosures],  # redacted_claim_keys
     }
     
-    edn = cbor_diag.cbor2diag(cbor2.dumps(sd_cwt_claims))
+    edn = edn_utils.cbor_to_diag(cbor2.dumps(sd_cwt_claims))
     print(f"   {edn[:200]}...")
 
 

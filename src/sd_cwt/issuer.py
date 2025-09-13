@@ -1,3 +1,4 @@
+from . import cbor_utils
 """SD-CWT Issuer implementation using EDN with redaction tags.
 
 This module implements SD-CWT (Selective Disclosure CBOR Web Token) issuance
@@ -10,9 +11,9 @@ import hashlib
 import secrets
 from typing import Any, Optional
 
-import cbor2
-import cbor_diag  # type: ignore[import-untyped]
 from fido2.cose import CoseKey
+
+from . import edn_utils
 
 
 class SDCWTIssuer:
@@ -43,8 +44,8 @@ class SDCWTIssuer:
             Tuple of (claims_dict, redacted_claim_names)
         """
         # Parse the EDN to CBOR
-        cbor_data = cbor_diag.diag2cbor(edn_claims)
-        claims = cbor2.loads(cbor_data)
+        cbor_data = edn_utils.diag_to_cbor(edn_claims)
+        claims = cbor_utils.decode(cbor_data)
 
         redacted_claims = []
 
@@ -57,9 +58,9 @@ class SDCWTIssuer:
                     # Check if this is a redacted claim key (tag 59)
                     if (
                         hasattr(value, "tag")
-                        and value.tag == self.REDACTED_CLAIM_KEY_TAG
+                        and cbor_utils.get_tag_number(value) == self.REDACTED_CLAIM_KEY_TAG
                         or hasattr(value, "tag")
-                        and value.tag == self.REDACTED_CLAIM_ELEMENT_TAG
+                        and cbor_utils.get_tag_number(value) == self.REDACTED_CLAIM_ELEMENT_TAG
                     ):
                         redacted_claims.append(key)
 
@@ -90,7 +91,7 @@ class SDCWTIssuer:
         """
         # SD-CWT format: [salt, value, key] (different from SD-JWT [salt, key, value])
         disclosure_array = [salt, claim_value, claim_name]
-        return cbor2.dumps(disclosure_array)
+        return cbor_utils.encode(disclosure_array)
 
     def hash_disclosure(self, disclosure: bytes) -> bytes:
         """Hash a disclosure using the configured hash algorithm.
@@ -165,13 +166,13 @@ class SDCWTIssuer:
         protected_header = {
             1: -7,  # ES256 algorithm
         }
-        protected_header_cbor = cbor2.dumps(protected_header)
+        protected_header_cbor = cbor_utils.encode(protected_header)
 
         # Unprotected header (empty)
         unprotected_header: dict[str, Any] = {}
 
         # Payload (SD-CWT claims)
-        payload = cbor2.dumps(sd_cwt_claims)
+        payload = cbor_utils.encode(sd_cwt_claims)
 
         # Create signing input: Sig_structure for COSE_Sign1
         sig_structure = [
@@ -181,7 +182,7 @@ class SDCWTIssuer:
             payload,  # Payload
         ]
 
-        cbor2.dumps(sig_structure)  # This would be used for actual signing
+        cbor_utils.encode(sig_structure)  # This would be used for actual signing
 
         # Sign with ES256 (placeholder - would use actual signing)
         # For now, create a dummy signature
@@ -191,7 +192,7 @@ class SDCWTIssuer:
         cose_sign1 = [protected_header_cbor, unprotected_header, payload, signature]
 
         # Encode as CBOR with tag 18 (COSE_Sign1)
-        sd_cwt = cbor2.dumps(cbor2.CBORTag(18, cose_sign1))
+        sd_cwt = cbor_utils.encode(cbor_utils.create_tag(18, cose_sign1))
 
         return {"sd_cwt": sd_cwt, "disclosures": disclosures, "holder_key": holder_key}
 
@@ -221,8 +222,8 @@ class SDCWTIssuer:
         Returns:
             EDN representation
         """
-        cbor_data = cbor2.dumps(data)
-        return cbor_diag.cbor2diag(cbor_data)  # type: ignore[no-any-return]
+        cbor_data = cbor_utils.encode(data)
+        return edn_utils.cbor_to_diag(cbor_data)
 
 
 def create_example_edn_claims() -> str:

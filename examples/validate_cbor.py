@@ -1,3 +1,4 @@
+from sd_cwt import edn_utils
 #!/usr/bin/env python3
 """Example script demonstrating CBOR and CDDL validation for SD-CWT."""
 
@@ -6,7 +7,6 @@ import hashlib
 import json
 
 import cbor2
-import cbor_diag
 
 from sd_cwt.validation import CBORValidator, CDDLValidator, SDCWTValidator
 
@@ -146,11 +146,11 @@ def demonstrate_cbor_diag():
     print(f"   {cbor_data.hex()}")
     
     print("\n3. CBOR diagnostic notation:")
-    diag = cbor_diag.cbor2diag(cbor_data)
+    diag = edn_utils.cbor_to_diag(cbor_data)
     print(f"   {diag}")
     
     print("\n4. Round-trip test:")
-    cbor_from_diag = cbor_diag.diag2cbor(diag)
+    cbor_from_diag = edn_utils.diag_to_cbor(diag)
     round_trip_data = cbor2.loads(cbor_from_diag)
     print(f"   Round-trip successful: {round_trip_data == complex_data}")
 

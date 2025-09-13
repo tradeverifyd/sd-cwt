@@ -1,8 +1,8 @@
+from sd_cwt import cbor_utils
 """Tests for SD-CWT edge cases and mandatory-to-disclose claim protections."""
 
 import time
 
-import cbor2
 import pytest
 
 from sd_cwt import (
@@ -53,8 +53,8 @@ class TestZeroDisclosureEdgeCases:
 
         # Decode and verify structure
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         # Verify all public claims are present
         assert payload[1] == "https://issuer.example"
@@ -66,7 +66,7 @@ class TestZeroDisclosureEdgeCases:
         assert validate_sd_cwt_cnf(payload) is True
 
         # Simple value 59 should not be present (no redacted claims)
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 not in payload
 
     def test_presentation_with_zero_disclosures(self) -> None:
@@ -140,8 +140,8 @@ class TestAllRedactedEdgeCases:
 
         # Decode and verify only mandatory/non-redacted claims remain
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         # Mandatory claims should be present
         assert payload[1] == "https://issuer.example"  # iss
@@ -157,7 +157,7 @@ class TestAllRedactedEdgeCases:
             assert claim not in payload
 
         # Simple value 59 should contain 8 hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in payload
         assert len(payload[simple_59]) == 8
 
@@ -206,7 +206,7 @@ class TestAllRedactedEdgeCases:
         # Check disclosed claims
         disclosed_claims = {}
         for disclosure in validation_result["disclosures"]:
-            decoded = cbor2.loads(disclosure)
+            decoded = cbor_utils.decode(disclosure)
             disclosed_claims[decoded[2]] = decoded[1]  # claim_name: claim_value
 
         assert "claim1" in disclosed_claims
@@ -236,8 +236,8 @@ class TestMandatoryToDiscloseClaimProtection:
 
             # Decode and verify cnf is always present
             sd_cwt = result["sd_cwt"]
-            decoded = cbor2.loads(sd_cwt)
-            payload = cbor2.loads(decoded.value[2])
+            decoded = cbor_utils.decode(sd_cwt)
+            payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
             assert validate_sd_cwt_cnf(payload), f"cnf claim missing in: {edn_claims}"
             assert 8 in payload, f"cnf claim (8) not found in: {edn_claims}"
@@ -269,8 +269,8 @@ class TestMandatoryToDiscloseClaimProtection:
 
         # Decode and verify standard claims are present
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         # Mandatory-to-disclose claims should be present and not redacted
         assert payload[1] == "https://issuer.example"  # iss
@@ -347,16 +347,16 @@ class TestEmptyPresentationEdgeCases:
 
         # Decode and verify structure
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        assert isinstance(decoded, cbor2.CBORTag)
-        assert decoded.tag == 18  # COSE_Sign1
+        decoded = cbor_utils.decode(sd_cwt)
+        assert cbor_utils.is_tag(decoded)
+        assert cbor_utils.get_tag_number(decoded) == 18  # COSE_Sign1
 
-        payload = cbor2.loads(decoded.value[2])
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         # Only cnf claim should be present
         assert validate_sd_cwt_cnf(payload)
         # Count claims - should be minimal (just cnf)
-        assert len([k for k in payload.keys() if not isinstance(k, cbor2.CBORSimpleValue)]) >= 1
+        assert len([k for k in payload.keys() if not cbor_utils.is_simple_value(k)]) >= 1
 
 
 class TestMalformedStructureValidation:
@@ -370,17 +370,17 @@ class TestMalformedStructureValidation:
         assert "Invalid SD-KBT structure" in result["errors"]
 
         # Valid CBOR but not COSE_Sign1 tagged
-        invalid_structure = cbor2.dumps({"not": "cose_sign1"})
+        invalid_structure = cbor_utils.encode({"not": "cose_sign1"})
         result = validate_sd_cwt_presentation(invalid_structure)
         assert result["valid"] is False
 
         # COSE_Sign1 but wrong tag
-        wrong_tag = cbor2.dumps(cbor2.CBORTag(17, [b"", {}, b"", b""]))  # Tag 17 instead of 18
+        wrong_tag = cbor_utils.encode(cbor_utils.create_tag(17, [b"", {}, b"", b""]))  # Tag 17 instead of 18
         result = validate_sd_cwt_presentation(wrong_tag)
         assert result["valid"] is False
 
         # COSE_Sign1 with wrong array length
-        wrong_length = cbor2.dumps(cbor2.CBORTag(18, [b"", {}, b""]))  # Missing signature
+        wrong_length = cbor_utils.encode(cbor_utils.create_tag(18, [b"", {}, b""]))  # Missing signature
         result = validate_sd_cwt_presentation(wrong_length)
         assert result["valid"] is False
 
@@ -405,14 +405,14 @@ class TestMalformedStructureValidation:
         )
 
         # Decode and modify to remove required headers
-        decoded = cbor2.loads(valid_presentation)
-        cose_array = decoded.value
+        decoded = cbor_utils.decode(valid_presentation)
+        cose_array = cbor_utils.get_tag_value(decoded)
 
         # Remove typ header by creating invalid protected header
-        invalid_protected = cbor2.dumps({1: -7})  # Only algorithm, no typ
+        invalid_protected = cbor_utils.encode({1: -7})  # Only algorithm, no typ
         cose_array[0] = invalid_protected
 
-        invalid_presentation = cbor2.dumps(cbor2.CBORTag(18, cose_array))
+        invalid_presentation = cbor_utils.encode(cbor_utils.create_tag(18, cose_array))
 
         # Should fail validation
         result = validate_sd_cwt_presentation(invalid_presentation)
@@ -461,8 +461,8 @@ class TestStandardClaimsHandling:
 
         # Verify original SD-CWT still has its cnonce
         sd_cwt = validation_result["sd_cwt"]
-        decoded_sd_cwt = cbor2.loads(sd_cwt)
-        sd_cwt_payload = cbor2.loads(decoded_sd_cwt.value[2])
+        decoded_sd_cwt = cbor_utils.decode(sd_cwt)
+        sd_cwt_payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded_sd_cwt)[2])
         assert 39 in sd_cwt_payload  # Original cnonce should be preserved
 
     def test_all_standard_cwt_claims(self) -> None:
@@ -493,8 +493,8 @@ class TestStandardClaimsHandling:
 
         # Verify structure
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         # All standard claims should be present
         standard_claims = [1, 2, 3, 4, 5, 6, 7, 39]
@@ -515,7 +515,7 @@ class TestStandardClaimsHandling:
         assert len(result["disclosures"]) == 2
 
         # Simple value 59 should have 2 hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in payload
         assert len(payload[simple_59]) == 2
 

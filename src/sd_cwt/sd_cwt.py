@@ -1,3 +1,4 @@
+from . import cbor_utils
 """Complete SD-CWT implementation with mandatory holder binding.
 
 This module provides high-level functions for creating SD-CWTs with mandatory
@@ -6,7 +7,6 @@ confirmation claims and SD-KBTs according to the IETF SPICE specification.
 
 from typing import Any, Optional
 
-import cbor2
 
 from .cose_keys import cose_key_generate, cose_key_to_dict, cose_key_thumbprint
 from .cose_sign1 import Signer, cose_sign1_sign
@@ -59,11 +59,11 @@ def create_sd_cwt_with_holder_binding(
 
     # Process EDN claims with redaction
     cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims, salt_generator)
-    base_claims = cbor2.loads(cbor_claims)
+    base_claims = cbor_utils.decode(cbor_claims)
 
     # Extract SD hashes if present
     sd_hashes = []
-    simple_59 = cbor2.CBORSimpleValue(59)
+    simple_59 = cbor_utils.create_simple_value(59)
     if simple_59 in base_claims:
         sd_hashes = base_claims[simple_59]
         del base_claims[simple_59]  # Remove before adding cnf
@@ -83,7 +83,7 @@ def create_sd_cwt_with_holder_binding(
         protected_header[4] = issuer_key_id  # kid
 
     # Encode payload
-    payload = cbor2.dumps(sd_cwt_claims)
+    payload = cbor_utils.encode(sd_cwt_claims)
 
     # Sign the SD-CWT
     sd_cwt = cose_sign1_sign(
@@ -132,7 +132,7 @@ def create_sd_cwt_presentation(
         "sd_cwt": sd_cwt,
         "disclosures": selected_disclosures
     }
-    sd_cwt_with_disclosures = cbor2.dumps(sd_cwt_with_disclosures_dict)
+    sd_cwt_with_disclosures = cbor_utils.encode(sd_cwt_with_disclosures_dict)
 
     # Create and return SD-KBT
     return create_sd_kbt(
@@ -181,7 +181,7 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
 
     try:
         # Extract SD-CWT with disclosures
-        sd_cwt_with_disclosures = cbor2.loads(extracted_info["kcwt"])
+        sd_cwt_with_disclosures = cbor_utils.decode(extracted_info["kcwt"])
 
         if not isinstance(sd_cwt_with_disclosures, dict):
             result["errors"].append("Invalid SD-CWT with disclosures format")
@@ -195,10 +195,10 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
             return result
 
         # Validate SD-CWT has mandatory cnf claim
-        sd_cwt_payload = cbor2.loads(sd_cwt)
-        if isinstance(sd_cwt_payload, cbor2.CBORTag) and sd_cwt_payload.tag == 18:
-            cose_sign1 = sd_cwt_payload.value
-            sd_cwt_claims = cbor2.loads(cose_sign1[2])  # payload
+        sd_cwt_payload = cbor_utils.decode(sd_cwt)
+        if cbor_utils.is_tag(sd_cwt_payload) and cbor_utils.get_tag_number(sd_cwt_payload) == 18:
+            cose_sign1 = cbor_utils.get_tag_value(sd_cwt_payload)
+            sd_cwt_claims = cbor_utils.decode(cose_sign1[2])  # payload
         else:
             result["errors"].append("Invalid SD-CWT format")
             return result
@@ -256,10 +256,10 @@ def extract_verified_claims(sd_kbt: bytes) -> dict[str, Any]:
         disclosures = validation_result["disclosures"]
 
         # Decode the SD-CWT to get base claims
-        decoded_sd_cwt = cbor2.loads(sd_cwt)
-        if isinstance(decoded_sd_cwt, cbor2.CBORTag) and decoded_sd_cwt.tag == 18:
-            cose_sign1 = decoded_sd_cwt.value
-            base_claims = cbor2.loads(cose_sign1[2])  # payload
+        decoded_sd_cwt = cbor_utils.decode(sd_cwt)
+        if cbor_utils.is_tag(decoded_sd_cwt) and cbor_utils.get_tag_number(decoded_sd_cwt) == 18:
+            cose_sign1 = cbor_utils.get_tag_value(decoded_sd_cwt)
+            base_claims = cbor_utils.decode(cose_sign1[2])  # payload
         else:
             result["errors"].append("Invalid SD-CWT structure")
             return result
@@ -268,13 +268,13 @@ def extract_verified_claims(sd_kbt: bytes) -> dict[str, Any]:
         verified_claims = base_claims.copy()
 
         # Remove the redacted claim hashes (simple value 59) - these are replaced by actual claims
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         if simple_59 in verified_claims:
             del verified_claims[simple_59]
 
         # Add disclosed claims from disclosures
         for disclosure_bytes in disclosures:
-            disclosure = cbor2.loads(disclosure_bytes)
+            disclosure = cbor_utils.decode(disclosure_bytes)
             # SD-CWT disclosure format: [salt, claim_value, claim_name]
             claim_name = disclosure[2]  # claim key
             claim_value = disclosure[1]  # claim value

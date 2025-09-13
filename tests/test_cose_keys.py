@@ -1,6 +1,6 @@
+from sd_cwt import cbor_utils
 """Tests for COSE key generation and management."""
 
-import cbor2
 import pytest
 
 from sd_cwt import (

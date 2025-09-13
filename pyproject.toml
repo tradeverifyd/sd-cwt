@@ -24,12 +24,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "cbor2>=5.4.0",
-    "fido2>=1.1.0", # For CBOR/COSE cryptographic operations
     "pydantic>=2.0.0",
-    "cbor-diag>=1.0.0", # For CBOR diagnostic notation
-    "pycddl>=0.4.0", # For CDDL validation
-    "zcbor>=0.9.1",
+    "cbor-diag>=1.0.0", # For CBOR diagnostic notation via edn_utils
+    "fido2>=1.1.0", # For CBOR/COSE cryptographic operations
+    "zcbor>=0.9.1", # For CDDL validation via cddl_utils
+    "cbor2>=5.4.0", # For CBOR encoding/decoding via cbor_utils
 ]
 
 [project.optional-dependencies]

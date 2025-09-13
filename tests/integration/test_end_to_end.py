@@ -1,10 +1,10 @@
+from sd_cwt import cbor_utils
 """End-to-end integration tests for SD-CWT."""
 
 import json
 from pathlib import Path
 from typing import Any
 
-import cbor2
 import pytest
 
 
@@ -53,11 +53,11 @@ class TestEndToEnd:
         claims[59] = ["hash1", "hash2", "hash3"]  # redacted_claim_keys
 
         # Serialize to CBOR
-        cbor_data = cbor2.dumps(claims)
+        cbor_data = cbor_utils.encode(claims)
         assert isinstance(cbor_data, bytes)
 
         # Deserialize from CBOR
-        decoded_claims = cbor2.loads(cbor_data)
+        decoded_claims = cbor_utils.decode(cbor_data)
 
         # Verify all claims are preserved
         assert decoded_claims == claims
@@ -148,10 +148,10 @@ class TestEndToEnd:
         large_claims = {f"claim_{i}": f"value_{i}" for i in range(1000)}
 
         # Serialize to CBOR
-        cbor_data = cbor2.dumps(large_claims)
+        cbor_data = cbor_utils.encode(large_claims)
 
         # Deserialize from CBOR
-        decoded = cbor2.loads(cbor_data)
+        decoded = cbor_utils.decode(cbor_data)
 
         performance_timer.stop()
 
@@ -163,7 +163,7 @@ class TestEndToEnd:
     def test_interoperability_format(self, mock_cwt_token: bytes):
         """Test format compatibility with other implementations."""
         # Decode mock CWT token
-        decoded = cbor2.loads(mock_cwt_token)
+        decoded = cbor_utils.decode(mock_cwt_token)
 
         # Verify expected SD-CWT structure
         assert 59 in decoded  # redacted_claim_keys

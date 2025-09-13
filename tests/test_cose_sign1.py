@@ -1,6 +1,6 @@
+from sd_cwt import cbor_utils
 """Tests for COSE Sign1 functionality."""
 
-import cbor2
 import pytest
 
 from sd_cwt import (
@@ -145,9 +145,9 @@ class TestCoseSign1Sanity:
         cose_sign1_message = cose_sign1_sign(payload, signer)
 
         # Decode and tamper with payload
-        decoded = cbor2.loads(cose_sign1_message)
-        if isinstance(decoded, cbor2.CBORTag):
-            cose_array = decoded.value
+        decoded = cbor_utils.decode(cose_sign1_message)
+        if cbor_utils.is_tag(decoded):
+            cose_array = cbor_utils.get_tag_value(decoded)
         else:
             cose_array = decoded
 
@@ -155,7 +155,7 @@ class TestCoseSign1Sanity:
         cose_array[2] = b"Tampered payload"
 
         # Re-encode
-        tampered_message = cbor2.dumps(cbor2.CBORTag(18, cose_array))
+        tampered_message = cbor_utils.encode(cbor_utils.create_tag(18, cose_array))
 
         # Try to verify tampered message
         is_valid, _ = cose_sign1_verify(tampered_message, verifier)
@@ -197,14 +197,14 @@ class TestCoseSign1Sanity:
         cose_sign1_message = cose_sign1_sign(payload, signer)
 
         # Decode and check structure
-        decoded = cbor2.loads(cose_sign1_message)
+        decoded = cbor_utils.decode(cose_sign1_message)
 
         # Should be tagged with tag 18
-        assert isinstance(decoded, cbor2.CBORTag), "Should be a CBOR tag"
-        assert decoded.tag == 18, "Should be tag 18 (COSE_Sign1)"
+        assert cbor_utils.is_tag(decoded), "Should be a CBOR tag"
+        assert cbor_utils.get_tag_number(decoded) == 18, "Should be tag 18 (COSE_Sign1)"
 
         # Check array structure
-        cose_array = decoded.value
+        cose_array = cbor_utils.get_tag_value(decoded)
         assert isinstance(cose_array, list), "COSE_Sign1 should be an array"
         assert len(cose_array) == 4, "COSE_Sign1 should have 4 elements"
 
@@ -213,7 +213,7 @@ class TestCoseSign1Sanity:
 
         # Decode protected header and check algorithm
         if cose_array[0]:
-            protected = cbor2.loads(cose_array[0])
+            protected = cbor_utils.decode(cose_array[0])
             assert 1 in protected, "Algorithm should be in protected header"
             assert protected[1] == -7, "Algorithm should be -7 (ES256)"
 

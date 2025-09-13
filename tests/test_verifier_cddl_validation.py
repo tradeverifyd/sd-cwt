@@ -1,3 +1,4 @@
+from sd_cwt import cbor_utils
 """End-to-end test for SD-CWT lifecycle with verifier CDDL validation.
 
 This test demonstrates the complete SD-CWT flow:
@@ -10,9 +11,6 @@ This test demonstrates the complete SD-CWT flow:
 import time
 from typing import Any, Dict
 
-import cbor2
-import zcbor  # type: ignore[import-untyped]
-
 from sd_cwt import (
     SeededSaltGenerator,
     cose_key_generate,
@@ -24,6 +22,7 @@ from sd_cwt import (
 )
 from sd_cwt.cose_sign1 import ES256Signer
 from sd_cwt.cddl_schemas import VERIFIED_CLAIMS_CDDL
+from sd_cwt import cddl_utils
 
 
 def validate_verified_claims_structure(claims: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -156,7 +155,7 @@ class TestSDCWTLifecycleWithCDDL:
         # Show what can be selectively disclosed
         print("\n   Available for selective disclosure:")
         for i, disclosure_bytes in enumerate(sd_cwt_result['disclosures']):
-            disclosure = cbor2.loads(disclosure_bytes)
+            disclosure = cbor_utils.decode(disclosure_bytes)
             claim_name = disclosure[2]  # claim key
             claim_value = disclosure[1]  # claim value
             if isinstance(claim_value, dict):
@@ -182,7 +181,7 @@ class TestSDCWTLifecycleWithCDDL:
 
         print("✓ Holder selecting disclosures for age verification:")
         for idx in selected_disclosures:
-            disclosure = cbor2.loads(sd_cwt_result['disclosures'][idx])
+            disclosure = cbor_utils.decode(sd_cwt_result['disclosures'][idx])
             claim_name = disclosure[2]
             claim_value = disclosure[1]
             print(f"     Revealing: {claim_name} = {claim_value}")
@@ -254,14 +253,14 @@ class TestSDCWTLifecycleWithCDDL:
 
         # Create CDDL validator for verified claims
         try:
-            cddl_validator = zcbor.DataTranslator.from_cddl(VERIFIED_CLAIMS_CDDL, default_max_qty=100)
+            cddl_validator = cddl_utils.create_validator(VERIFIED_CLAIMS_CDDL)
             print("✓ CDDL schema compiled successfully with zcbor")
         except Exception as e:
             print(f"✗ CDDL schema compilation failed: {e}")
             assert False, f"CDDL schema compilation failed: {e}"
 
         # Convert verified claims to CBOR for CDDL validation
-        claims_cbor = cbor2.dumps(verified_claims)
+        claims_cbor = cbor_utils.encode(verified_claims)
         print(f"✓ Claims serialized to CBOR: {len(claims_cbor)} bytes")
 
         # Due to zcbor limitations with complex string key validation,
@@ -271,7 +270,7 @@ class TestSDCWTLifecycleWithCDDL:
 
         try:
             # Basic CBOR structure validation
-            decoded_claims = cbor2.loads(claims_cbor)
+            decoded_claims = cbor_utils.decode(claims_cbor)
 
             # Essential claim validation - check mandatory claims
             if 1 not in decoded_claims or not isinstance(decoded_claims[1], str):
@@ -397,9 +396,8 @@ class TestSDCWTLifecycleWithCDDL:
         assert claims_result["valid"], f"Claims extraction failed: {claims_result['errors']}"
 
         # Validate minimal claims with CDDL
-        cddl_validator = zcbor.DataTranslator.from_cddl(VERIFIED_CLAIMS_CDDL, default_max_qty=100)
-        type_obj = cddl_validator.my_types["verified-claims"]
-        type_obj.validate_obj(claims_result["claims"])  # Should not raise
+        cddl_validator = cddl_utils.create_validator(VERIFIED_CLAIMS_CDDL)
+        assert cddl_validator.validate_obj(claims_result["claims"], "verified-claims")
 
         # Test case 2: Maximum disclosure (all available claims)
         edn_maximal = """

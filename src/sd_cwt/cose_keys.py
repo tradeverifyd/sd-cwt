@@ -1,9 +1,9 @@
+from . import cbor_utils
 """COSE Key generation and management."""
 
 from enum import IntEnum
 from typing import Any, Optional
 
-import cbor2
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, ed448
 from cryptography.hazmat.backends import default_backend
@@ -125,7 +125,7 @@ def _generate_ec_key(
     if key_id is not None:
         cose_key[2] = key_id  # kid: Key ID
 
-    return cbor2.dumps(cose_key)
+    return cbor_utils.encode(cose_key)
 
 
 def _generate_okp_key(
@@ -190,7 +190,7 @@ def _generate_okp_key(
     if key_id is not None:
         cose_key[2] = key_id  # kid: Key ID
 
-    return cbor2.dumps(cose_key)
+    return cbor_utils.encode(cose_key)
 
 
 def cose_key_from_dict(key_dict: dict[int, Any]) -> bytes:
@@ -202,7 +202,7 @@ def cose_key_from_dict(key_dict: dict[int, Any]) -> bytes:
     Returns:
         CBOR-encoded COSE_Key
     """
-    return cbor2.dumps(key_dict)
+    return cbor_utils.encode(key_dict)
 
 
 def cose_key_to_dict(cose_key: bytes) -> dict[int, Any]:
@@ -214,7 +214,7 @@ def cose_key_to_dict(cose_key: bytes) -> dict[int, Any]:
     Returns:
         COSE key as a dictionary
     """
-    return cbor2.loads(cose_key)
+    return cbor_utils.decode(cose_key)
 
 
 def cose_key_get_public(cose_key: bytes) -> bytes:
@@ -274,7 +274,7 @@ def cose_key_thumbprint(cose_key: bytes, hash_algorithm: str = "sha-256") -> byt
         raise ValueError(f"Unsupported key type: {kty}")
 
     # Encode canonically
-    canonical_cbor = cbor2.dumps(canonical)
+    canonical_cbor = cbor_utils.encode(canonical)
 
     # Calculate hash
     if hash_algorithm == "sha-256":

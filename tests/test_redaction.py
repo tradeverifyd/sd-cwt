@@ -1,9 +1,9 @@
+from sd_cwt import cbor_utils
 """Tests for EDN redaction and disclosure handling."""
 
 import hashlib
 from unittest.mock import patch
 
-import cbor2
 import pytest
 
 from sd_cwt.redaction import (
@@ -34,14 +34,14 @@ class TestBasicFunctions:
         assert isinstance(cbor_bytes, bytes)
 
         # Decode and verify
-        decoded = cbor2.loads(cbor_bytes)
+        decoded = cbor_utils.decode(cbor_bytes)
         assert decoded["name"] == "Alice"
         assert decoded["age"] == 30
 
     def test_cbor_to_dict(self) -> None:
         """Test CBOR bytes to dictionary conversion."""
         data = {"test": "value", "number": 42}
-        cbor_bytes = cbor2.dumps(data)
+        cbor_bytes = cbor_utils.encode(data)
 
         result = cbor_to_dict(cbor_bytes)
 
@@ -74,7 +74,7 @@ class TestBasicFunctions:
         assert isinstance(disclosure, bytes)
 
         # Decode and verify structure [salt, value, key]
-        decoded = cbor2.loads(disclosure)
+        decoded = cbor_utils.decode(disclosure)
         assert isinstance(decoded, list)
         assert len(decoded) == 3
         assert decoded[0] == salt
@@ -112,7 +112,7 @@ class TestRedactionDetection:
         """Test finding simple redacted claims."""
         claims = {
             "name": "Alice",
-            "email": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
+            "email": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
             "age": 30,
         }
 
@@ -127,7 +127,7 @@ class TestRedactionDetection:
             "name": "Alice",
             "address": {
                 "street": "123 Main St",
-                "city": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "Seattle"),
+                "city": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "Seattle"),
                 "zip": "98101",
             },
         }
@@ -143,7 +143,7 @@ class TestRedactionDetection:
             "name": "Alice",
             "phones": [
                 "555-0100",
-                cbor2.CBORTag(REDACTED_CLAIM_ELEMENT_TAG, "555-0101"),
+                cbor_utils.create_tag(REDACTED_CLAIM_ELEMENT_TAG, "555-0101"),
                 "555-0102",
             ],
         }
@@ -156,11 +156,11 @@ class TestRedactionDetection:
     def test_find_redacted_claims_multiple(self) -> None:
         """Test finding multiple redacted claims."""
         claims = {
-            "name": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "Alice"),
-            "email": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
+            "name": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "Alice"),
+            "email": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
             "nested": {
                 "field1": "value1",
-                "field2": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "value2"),
+                "field2": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "value2"),
             },
         }
 
@@ -180,7 +180,7 @@ class TestRedactionProcessing:
         """Test processing simple redactions."""
         claims = {
             "name": "Alice",
-            "email": cbor2.CBORTag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
+            "email": cbor_utils.create_tag(REDACTED_CLAIM_KEY_TAG, "alice@example.com"),
             "age": 30,
         }
 
@@ -198,7 +198,7 @@ class TestRedactionProcessing:
 
         # Check disclosures
         assert len(disclosures) == 1
-        decoded_disclosure = cbor2.loads(disclosures[0])
+        decoded_disclosure = cbor_utils.decode(disclosures[0])
         assert decoded_disclosure[0] == b"0" * 16  # Salt
         assert decoded_disclosure[1] == "alice@example.com"  # Value
         assert decoded_disclosure[2] == "email"  # Key
@@ -219,7 +219,7 @@ class TestRedactionProcessing:
         assert sd_cwt_claims["sub"] == "user123"
 
         # Check simple value 59 is used for hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in sd_cwt_claims
         assert sd_cwt_claims[simple_59] == hashes
 
@@ -231,7 +231,7 @@ class TestRedactionProcessing:
         sd_cwt_claims = build_sd_cwt_claims(claims, hashes)
 
         assert sd_cwt_claims == claims
-        assert cbor2.CBORSimpleValue(59) not in sd_cwt_claims
+        assert cbor_utils.create_simple_value(59) not in sd_cwt_claims
 
 
 class TestEndToEnd:
@@ -252,7 +252,7 @@ class TestEndToEnd:
             cbor_claims, disclosures = edn_to_redacted_cbor(edn)
 
         # Decode CBOR claims
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # Check non-redacted claims
         assert claims["iss"] == "https://issuer.example"
@@ -263,13 +263,13 @@ class TestEndToEnd:
         assert "email" not in claims
 
         # Check simple value 59 contains hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
         assert len(claims[simple_59]) == 1  # One hash
 
         # Check disclosures
         assert len(disclosures) == 1
-        decoded = cbor2.loads(disclosures[0])
+        decoded = cbor_utils.decode(disclosures[0])
         assert decoded[2] == "email"
         assert decoded[1] == "alice@example.com"
 
@@ -294,7 +294,7 @@ class TestEndToEnd:
         cbor_claims, disclosures = edn_to_redacted_cbor(edn)
 
         # Decode CBOR claims
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # Check non-redacted claims
         assert claims[1] == "https://issuer.example"
@@ -337,7 +337,7 @@ class TestEndToEnd:
 
         # Verify hex can be decoded back
         cbor_from_hex = bytes.fromhex(cbor_hex)
-        claims = cbor2.loads(cbor_from_hex)
+        claims = cbor_utils.decode(cbor_from_hex)
 
         assert claims["iss"] == "https://issuer.example"
         assert claims["sub"] == "user123"
@@ -345,7 +345,7 @@ class TestEndToEnd:
         assert "name" not in claims
 
         # Simple value 59 should contain 2 hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
         assert len(claims[simple_59]) == 2
 
@@ -408,7 +408,7 @@ class TestEndToEnd:
         cbor_hex = cbor_claims.hex()
 
         # Decode to verify structure
-        claims = cbor2.loads(bytes.fromhex(cbor_hex))
+        claims = cbor_utils.decode(bytes.fromhex(cbor_hex))
 
         # Verify non-redacted claims
         assert claims[1] == "https://issuer.example"
@@ -428,7 +428,7 @@ class TestEndToEnd:
         assert "zip" not in claims["address"]
 
         # Verify SD hashes are present
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
         sd_hashes = claims[simple_59]
         assert isinstance(sd_hashes, list)
@@ -448,7 +448,7 @@ class TestEndToEnd:
         print(f"Number of redacted claims: {len(disclosures)}")
         print(f"\nDisclosures:")
         for i, disclosure in enumerate(disclosures):
-            decoded = cbor2.loads(disclosure)
+            decoded = cbor_utils.decode(disclosure)
             print(f"  {i+1}. Key: {decoded[2]}, Value: {decoded[1]}")
         print(f"\nFull CBOR hex:\n{cbor_hex}")
 
@@ -561,7 +561,7 @@ class TestSaltGenerators:
         hex_output = cbor_claims.hex()
 
         # Verify structure
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
         assert claims[1] == "https://issuer.example"
         assert claims[2] == "user123"
         assert claims["role"] == "admin"
@@ -569,7 +569,7 @@ class TestSaltGenerators:
         assert "verified" not in claims
 
         # Check that we have expected number of hashes
-        simple_59 = cbor2.CBORSimpleValue(59)
+        simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
         assert len(claims[simple_59]) == 2  # Two redacted claims
 

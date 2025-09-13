@@ -6,9 +6,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import cbor2
 import pytest
 from fido2.cose import ES256, CoseKey
+
+from sd_cwt import cbor_utils
 
 
 @pytest.fixture(scope="session")
@@ -95,13 +96,13 @@ def selective_disclosure_claims() -> dict[str, Any]:
 @pytest.fixture
 def cbor_encoder():
     """Provide a configured CBOR encoder."""
-    return cbor2.CBOREncoder()
+    return cbor_utils.encode
 
 
 @pytest.fixture
 def cbor_decoder():
     """Provide a configured CBOR decoder."""
-    return cbor2.CBORDecoder()
+    return cbor_utils.decode
 
 
 @pytest.fixture
@@ -143,7 +144,7 @@ def mock_cwt_token() -> bytes:
         "iat": 1234567890,
         59: ["hash1", "hash2", "hash3"],  # redacted_claim_keys (simple value 59)
     }
-    return cbor2.dumps(mock_payload)
+    return cbor_utils.encode(mock_payload)
 
 
 @pytest.fixture
@@ -170,7 +171,7 @@ class TestDataManager:
     def read_cbor(self, filename: str) -> Any:
         """Read CBOR test data file."""
         with open(self.base_path / filename, "rb") as f:
-            return cbor2.load(f)
+            return cbor_utils.decode(f.read())
 
     def write_json(self, filename: str, data: dict[str, Any]) -> None:
         """Write JSON test data file."""
@@ -180,7 +181,7 @@ class TestDataManager:
     def write_cbor(self, filename: str, data: Any) -> None:
         """Write CBOR test data file."""
         with open(self.base_path / filename, "wb") as f:
-            cbor2.dump(data, f)
+            f.write(cbor_utils.encode(data))
 
 
 @pytest.fixture

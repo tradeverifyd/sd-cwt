@@ -4,12 +4,9 @@
 import base64
 import hashlib
 
-import cbor2
-import cbor_diag
-import pycddl
-
-from sd_cwt.cddl_schemas import COSE_KEY_THUMBPRINT_CDDL, SD_CWT_CDDL
+from sd_cwt import cbor_utils, edn_utils
 from sd_cwt.thumbprint import CoseKeyThumbprint
+from sd_cwt.validation import CDDLValidator
 
 
 def demonstrate_cbor_edn():
@@ -40,7 +37,7 @@ def demonstrate_cbor_edn():
     print("  " + clean_edn.strip().replace("\n", "\n  "))
     
     # Convert to CBOR
-    cbor_data = cbor_diag.diag2cbor(clean_edn)
+    cbor_data = edn_utils.diag_to_cbor(clean_edn)
     print(f"\n  CBOR hex: {cbor_data.hex()[:60]}...")
     print(f"  CBOR size: {len(cbor_data)} bytes")
     
@@ -66,8 +63,8 @@ def demonstrate_cbor_edn():
     
     print(f"  EDN: {disclosure_edn}")
     
-    disclosure_cbor = cbor_diag.diag2cbor(disclosure_edn)
-    decoded = cbor2.loads(disclosure_cbor)
+    disclosure_cbor = edn_utils.diag_to_cbor(disclosure_edn)
+    decoded = cbor_utils.decode(disclosure_cbor)
     print(f"  Decoded: [salt={decoded[0]!r}, value={decoded[1]!r}, key={decoded[2]!r}]")
 
 
@@ -95,19 +92,22 @@ def demonstrate_cddl_validation():
     print(f"   Redacted Claim Keys: {len(claims[59])} hashes")
     
     # Convert to CBOR
-    cbor_data = cbor2.dumps(claims)
+    cbor_data = cbor_utils.encode(claims)
     
     # Convert to EDN for display
-    edn = cbor_diag.cbor2diag(cbor_data)
+    edn = edn_utils.cbor_to_diag(cbor_data)
     print("\n2. CBOR Diagnostic Notation:")
     print(f"   {edn[:200]}...")
     
-    # Try CDDL validation (if pycddl works)
+    # Try CDDL validation with zcbor
     print("\n3. CDDL Validation:")
     try:
-        schema = pycddl.Schema(SD_CWT_CDDL)
-        schema.validate_cbor(cbor_data, "sd-cwt-claims")
-        print("   ✓ Valid according to SD-CWT CDDL schema")
+        validator = CDDLValidator()
+        is_valid = validator.validate(cbor_data, "sd-cwt-claims")
+        if is_valid:
+            print("   ✓ Valid according to SD-CWT CDDL schema")
+        else:
+            print("   ⚠ CDDL validation failed")
     except Exception as e:
         print(f"   Note: CDDL validation not available ({str(e)[:50]}...)")
         print("   Structure validation passed manually")
@@ -159,7 +159,7 @@ def demonstrate_cose_key_validation():
         print(f"  Canonical CBOR size: {len(canonical)} bytes")
         
         # Convert to EDN
-        edn = cbor_diag.cbor2diag(canonical)
+        edn = edn_utils.cbor_to_diag(canonical)
         print(f"  Canonical EDN: {edn[:100]}...")
 
 
@@ -210,7 +210,7 @@ def demonstrate_test_vectors():
     print(f"   URI: {uri}")
     
     # Convert to CBOR and show size
-    cbor_data = cbor2.dumps(test_vector)
+    cbor_data = cbor_utils.encode(test_vector)
     print(f"\n3. Encoded size: {len(cbor_data)} bytes")
 
 
@@ -257,7 +257,7 @@ def demonstrate_real_world_example():
             disclosures.append(disclosure)
             
             # Hash the disclosure
-            disclosure_cbor = cbor2.dumps(disclosure)
+            disclosure_cbor = cbor_utils.encode(disclosure)
             sd_hash = hashlib.sha256(disclosure_cbor).digest()
             sd_hashes.append(sd_hash)
     

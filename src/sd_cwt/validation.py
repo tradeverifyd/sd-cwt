@@ -1,10 +1,9 @@
+from . import cbor_utils
 """CBOR and CDDL validation utilities for SD-CWT."""
 
 from typing import Any, Optional
 
-import cbor2
-import cbor_diag  # type: ignore[import-untyped]
-import zcbor  # type: ignore[import-untyped]
+from . import cddl_utils, edn_utils
 
 
 class CBORValidator:
@@ -20,7 +19,7 @@ class CBORValidator:
         Returns:
             Diagnostic notation string
         """
-        return cbor_diag.cbor2diag(cbor_data)  # type: ignore[no-any-return]
+        return edn_utils.cbor_to_diag(cbor_data)
 
     @staticmethod
     def from_diagnostic(diag_str: str) -> bytes:
@@ -32,7 +31,7 @@ class CBORValidator:
         Returns:
             CBOR encoded bytes
         """
-        return cbor_diag.diag2cbor(diag_str)  # type: ignore[no-any-return]
+        return edn_utils.diag_to_cbor(diag_str)
 
     @staticmethod
     def validate_structure(cbor_data: bytes) -> bool:
@@ -45,9 +44,9 @@ class CBORValidator:
             True if valid CBOR structure
         """
         try:
-            cbor2.loads(cbor_data)
+            cbor_utils.decode(cbor_data)
             return True
-        except (cbor2.CBORDecodeError, ValueError, TypeError):
+        except (cbor_utils.CBORDecodeError, ValueError, TypeError):
             return False
 
     @staticmethod
@@ -107,16 +106,7 @@ class CDDLValidator:
             cddl_schema: Optional custom CDDL schema string
         """
         self.schema = cddl_schema or self.SD_CWT_CDDL
-        self.validator = None
-        self._compile_schema()
-
-    def _compile_schema(self) -> None:
-        """Compile the CDDL schema."""
-        try:
-            self.validator = zcbor.DataTranslator.from_cddl(self.schema, default_max_qty=100)
-        except Exception as e:
-            print(f"Failed to compile CDDL schema with zcbor: {e}")
-            self.validator = None
+        self.validator = cddl_utils.create_validator(self.schema)
 
     def validate(self, cbor_data: bytes, type_name: str = "sd-cwt") -> bool:
         """Validate CBOR data against CDDL schema.
@@ -128,19 +118,7 @@ class CDDLValidator:
         Returns:
             True if valid according to schema
         """
-        if not self.validator:
-            return False
-
-        try:
-            # Decode CBOR data first
-            decoded_data = cbor2.loads(cbor_data)
-
-            # Use zcbor to validate the data structure
-            type_obj = self.validator.my_types[type_name]
-            type_obj.validate_obj(decoded_data)
-            return True
-        except Exception:
-            return False
+        return self.validator.validate(cbor_data, type_name)
 
     def validate_disclosure(self, disclosure_cbor: bytes) -> bool:
         """Validate a disclosure array.
@@ -195,11 +173,11 @@ class SDCWTValidator:
 
         # Check for SD-CWT specific claims and headers
         try:
-            decoded = cbor2.loads(token)
+            decoded = cbor_utils.decode(token)
             if isinstance(decoded, list) and len(decoded) >= 4:
                 # Extract payload and headers from COSE structure
-                payload = cbor2.loads(decoded[2])
-                protected_header = cbor2.loads(decoded[0]) if decoded[0] else {}
+                payload = cbor_utils.decode(decoded[2])
+                protected_header = cbor_utils.decode(decoded[0]) if decoded[0] else {}
                 unprotected_header = decoded[1]
 
                 # Check for redacted_claim_keys (simple value 59)
@@ -258,7 +236,7 @@ class SDCWTValidator:
 
         # Check disclosure format
         try:
-            decoded = cbor2.loads(disclosure)
+            decoded = cbor_utils.decode(disclosure)
             if not isinstance(decoded, list):
                 results["errors"].append("Disclosure must be an array")
             elif len(decoded) != 3:

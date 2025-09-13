@@ -1,3 +1,4 @@
+from . import cbor_utils
 """EDN-based claim redaction syntax for SD-CWT.
 
 This module provides utilities for marking claims for redaction using
@@ -8,8 +9,7 @@ in draft-ietf-spice-sd-cwt.
 import re
 from typing import Any, Union
 
-import cbor2
-import cbor_diag  # type: ignore[import-untyped]
+from . import edn_utils
 
 
 class EDNRedactionParser:
@@ -56,8 +56,8 @@ class EDNRedactionParser:
         clean_edn = self._remove_redaction_tags(processed_edn)
 
         try:
-            cbor_data = cbor_diag.diag2cbor(clean_edn)
-            claims = cbor2.loads(cbor_data)
+            cbor_data = edn_utils.diag_to_cbor(clean_edn)
+            claims = cbor_utils.decode(cbor_data)
         except Exception as e:
             raise ValueError(f"Failed to parse EDN: {e}") from e
 
@@ -193,8 +193,8 @@ class EDNRedactionBuilder:
                 else:
                     # For complex types, convert to CBOR then back to EDN
                     try:
-                        cbor_data = cbor2.dumps(claim_value)
-                        val_edn = cbor_diag.cbor2diag(cbor_data)
+                        cbor_data = cbor_utils.encode(claim_value)
+                        val_edn = edn_utils.cbor_to_diag(cbor_data)
                     except Exception:
                         val_edn = str(claim_value)
 

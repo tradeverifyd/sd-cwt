@@ -1,8 +1,8 @@
+from sd_cwt import cbor_utils
 """Unit tests for CWT (CBOR Web Token) functionality matching SD-CWT specification."""
 
 from datetime import datetime, timedelta, timezone
 
-import cbor2
 import pytest
 
 
@@ -77,11 +77,11 @@ class TestCWT:
         }
 
         # Should be CBOR serializable
-        encoded = cbor2.dumps(minimal_claims)
+        encoded = cbor_utils.encode(minimal_claims)
         assert isinstance(encoded, bytes)
 
         # Should be decodable
-        decoded = cbor2.loads(encoded)
+        decoded = cbor_utils.decode(encoded)
         assert decoded == minimal_claims
 
         # Verify integer labels
@@ -120,13 +120,13 @@ class TestCWT:
             6: 1725244200,  # iat
         }
 
-        encoded = cbor2.dumps(spec_claims)
+        encoded = cbor_utils.encode(spec_claims)
 
         assert isinstance(encoded, bytes)
         assert len(encoded) > 0
 
         # Decode and verify
-        decoded = cbor2.loads(encoded)
+        decoded = cbor_utils.decode(encoded)
         assert decoded == spec_claims
 
     @pytest.mark.unit
@@ -163,8 +163,8 @@ class TestCWT:
         }
 
         # Encode with nested structure
-        encoded = cbor2.dumps(spec_claims)
-        decoded = cbor2.loads(encoded)
+        encoded = cbor_utils.encode(spec_claims)
+        decoded = cbor_utils.decode(encoded)
 
         # Verify nested structure is preserved
         assert decoded[503] == spec_claims[503]

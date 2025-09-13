@@ -1,6 +1,6 @@
+from sd_cwt import cbor_utils
 """Unit tests for CBOR and CDDL validation."""
 
-import cbor2
 import pytest
 
 from sd_cwt.validation import CBORValidator, CDDLValidator, SDCWTValidator
@@ -13,7 +13,7 @@ class TestCBORValidator:
     def test_cbor_to_diagnostic(self):
         """Test converting CBOR to diagnostic notation."""
         data = {"key": "value", "number": 42}
-        cbor_data = cbor2.dumps(data)
+        cbor_data = cbor_utils.encode(data)
 
         validator = CBORValidator()
         diag = validator.to_diagnostic(cbor_data)
@@ -32,7 +32,7 @@ class TestCBORValidator:
         cbor_data = validator.from_diagnostic(diag_str)
 
         assert isinstance(cbor_data, bytes)
-        decoded = cbor2.loads(cbor_data)
+        decoded = cbor_utils.decode(cbor_data)
         assert decoded["key"] == "value"
         assert decoded["number"] == 42
 
@@ -40,7 +40,7 @@ class TestCBORValidator:
     def test_validate_valid_cbor(self):
         """Test validating valid CBOR structure."""
         data = {"test": "data"}
-        cbor_data = cbor2.dumps(data)
+        cbor_data = cbor_utils.encode(data)
 
         validator = CBORValidator()
         assert validator.validate_structure(cbor_data) is True
@@ -82,10 +82,10 @@ class TestCDDLValidator:
     def test_validate_disclosure_format(self):
         """Test validating disclosure array format."""
         disclosure = [b"salt123", "claim_value", "claim_name"]  # SD-CWT format: [salt, value, key]
-        disclosure_cbor = cbor2.dumps(disclosure)
+        disclosure_cbor = cbor_utils.encode(disclosure)
 
         validator = CDDLValidator()
-        # Note: This might fail if pycddl is not properly installed
+        # Note: This might fail if zcbor is not properly installed
         # or if the schema compilation fails
         result = validator.validate_disclosure(disclosure_cbor)
         assert isinstance(result, bool)
@@ -128,7 +128,7 @@ class TestSDCWTValidator:
     @pytest.mark.unit
     def test_validate_token_missing_sd_claims(self):
         """Test validating token without SD claims."""
-        token_without_sd = cbor2.dumps({"iss": "issuer", "sub": "subject", "iat": 1234567890})
+        token_without_sd = cbor_utils.encode({"iss": "issuer", "sub": "subject", "iat": 1234567890})
 
         validator = SDCWTValidator()
         results = validator.validate_token(token_without_sd)
@@ -142,7 +142,7 @@ class TestSDCWTValidator:
     def test_validate_disclosure(self):
         """Test validating disclosure array."""
         valid_disclosure = [b"salt", "value", "name"]  # SD-CWT format: [salt, value, key]
-        disclosure_cbor = cbor2.dumps(valid_disclosure)
+        disclosure_cbor = cbor_utils.encode(valid_disclosure)
 
         validator = SDCWTValidator()
         results = validator.validate_disclosure(disclosure_cbor)
@@ -156,7 +156,7 @@ class TestSDCWTValidator:
         """Test validating invalid disclosure."""
         # Wrong number of elements
         invalid_disclosure = [b"salt", "name"]
-        disclosure_cbor = cbor2.dumps(invalid_disclosure)
+        disclosure_cbor = cbor_utils.encode(invalid_disclosure)
 
         validator = SDCWTValidator()
         results = validator.validate_disclosure(disclosure_cbor)
@@ -171,7 +171,7 @@ class TestSDCWTValidator:
         """Test validating disclosure with wrong types."""
         # Salt should be bytes, not string
         invalid_disclosure = ["salt_string", "name", "value"]
-        disclosure_cbor = cbor2.dumps(invalid_disclosure)
+        disclosure_cbor = cbor_utils.encode(invalid_disclosure)
 
         validator = SDCWTValidator()
         results = validator.validate_disclosure(disclosure_cbor)

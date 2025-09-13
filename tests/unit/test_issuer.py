@@ -1,10 +1,9 @@
+from sd_cwt import cbor_utils, edn_utils
 """Unit tests for SD-CWT issuer implementation."""
 
 import hashlib
 import secrets
 
-import cbor2
-import cbor_diag
 import pytest
 from fido2.cose import CoseKey
 
@@ -80,7 +79,7 @@ class TestSDCWTIssuer:
         disclosure = issuer.create_disclosure(salt, claim_name, claim_value)
 
         # Verify it's valid CBOR with SD-CWT format: [salt, value, key]
-        decoded = cbor2.loads(disclosure)
+        decoded = cbor_utils.decode(disclosure)
         assert len(decoded) == 3
         assert decoded[0] == salt
         assert decoded[1] == claim_value  # value is second in SD-CWT format
@@ -89,7 +88,7 @@ class TestSDCWTIssuer:
     @pytest.mark.unit
     def test_hash_disclosure(self, issuer: SDCWTIssuer):
         """Test hashing a disclosure."""
-        disclosure = cbor2.dumps([b"salt", "value", "claim"])  # SD-CWT format: [salt, value, key]
+        disclosure = cbor_utils.encode([b"salt", "value", "claim"])  # SD-CWT format: [salt, value, key]
 
         # Test SHA-256 (default)
         hash_256 = issuer.hash_disclosure(disclosure)
@@ -155,11 +154,11 @@ class TestSDCWTIssuer:
 
         # Verify the SD-CWT contains cnf claim
         # Decode the COSE_Sign1 to check payload
-        sd_cwt_tag = cbor2.loads(result["sd_cwt"])
+        sd_cwt_tag = cbor_utils.decode(result["sd_cwt"])
         assert sd_cwt_tag.tag == 18  # COSE_Sign1 tag
 
         cose_sign1 = sd_cwt_tag.value
-        payload = cbor2.loads(cose_sign1[2])  # payload is third element
+        payload = cbor_utils.decode(cose_sign1[2])  # payload is third element
 
         assert 8 in payload  # cnf claim
         assert 1 in payload[8]  # COSE_Key in cnf
@@ -212,19 +211,19 @@ class TestSDCWTIssuer:
         result = issuer.create_sd_cwt(edn_claims)
 
         # Decode and validate structure
-        sd_cwt_tag = cbor2.loads(result["sd_cwt"])
+        sd_cwt_tag = cbor_utils.decode(result["sd_cwt"])
         assert sd_cwt_tag.tag == 18  # COSE_Sign1 tag
 
         cose_sign1 = sd_cwt_tag.value
         assert len(cose_sign1) == 4  # [protected, unprotected, payload, signature]
 
         # Verify protected header
-        protected = cbor2.loads(cose_sign1[0])
+        protected = cbor_utils.decode(cose_sign1[0])
         assert 1 in protected  # Algorithm parameter
         assert protected[1] == -7  # ES256
 
         # Verify payload contains SD-CWT claims
-        payload = cbor2.loads(cose_sign1[2])
+        payload = cbor_utils.decode(cose_sign1[2])
         assert 1 in payload  # iss
         assert 2 in payload  # sub
         assert 6 in payload  # iat
@@ -248,7 +247,7 @@ class TestSDCWTIssuer:
     @pytest.mark.unit
     def test_multiple_hash_algorithms(self, issuer: SDCWTIssuer):
         """Test support for different hash algorithms."""
-        disclosure = cbor2.dumps([b"salt", "value", "claim"])  # SD-CWT format: [salt, value, key]
+        disclosure = cbor_utils.encode([b"salt", "value", "claim"])  # SD-CWT format: [salt, value, key]
 
         # Test all supported algorithms
         for alg in ["sha-256", "sha-384", "sha-512"]:
@@ -277,7 +276,7 @@ class TestSDCWTIssuer:
         assert len(salt) == 16
 
         disclosure = issuer.create_disclosure(salt, "test_claim", "test_value")
-        decoded = cbor2.loads(disclosure)
+        decoded = cbor_utils.decode(disclosure)
 
         assert len(decoded[0]) == 16  # Salt should be 128 bits / 16 bytes
 
@@ -290,7 +289,7 @@ class TestSDCWTIssuer:
         edn = issuer.to_edn(original_data)
 
         # Parse back from EDN
-        cbor_data = cbor_diag.diag2cbor(edn)
-        recovered_data = cbor2.loads(cbor_data)
+        cbor_data = edn_utils.diag_to_cbor(edn)
+        recovered_data = cbor_utils.decode(cbor_data)
 
         assert recovered_data == original_data

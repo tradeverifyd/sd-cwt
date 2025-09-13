@@ -1,3 +1,4 @@
+from . import cbor_utils
 """SD-CWT Holder Binding implementation.
 
 This module implements mandatory holder binding for SD-CWT according to the
@@ -7,7 +8,6 @@ latest IETF SPICE specification, including SD-KBT (Key Binding Token) generation
 import hashlib
 from typing import Any, Optional
 
-import cbor2
 
 from .cose_keys import cose_key_thumbprint, cose_key_to_dict
 from .cose_sign1 import Signer, cose_sign1_sign
@@ -45,7 +45,7 @@ def extract_holder_key_from_cnf(cnf_claim: dict[int, Any]) -> Optional[bytes]:
     """
     if 1 in cnf_claim:
         # Full COSE Key
-        return cbor2.dumps(cnf_claim[1])
+        return cbor_utils.encode(cnf_claim[1])
     elif 3 in cnf_claim:
         # COSE Key Thumbprint - cannot reconstruct key
         return None
@@ -101,7 +101,7 @@ def create_sd_kbt(
     unprotected_header: dict[str, Any] = {}
 
     # Encode payload
-    payload_bytes = cbor2.dumps(kbt_payload)
+    payload_bytes = cbor_utils.encode(kbt_payload)
 
     # Sign the SD-KBT
     sd_kbt = cose_sign1_sign(
@@ -140,7 +140,7 @@ def create_sd_cwt_with_mandatory_cnf(
 
     # Add selective disclosure hashes if present
     if sd_hashes:
-        sd_cwt_claims[cbor2.CBORSimpleValue(59)] = sd_hashes
+        sd_cwt_claims[cbor_utils.create_simple_value(59)] = sd_hashes
 
     return sd_cwt_claims
 
@@ -178,9 +178,9 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
     """
     try:
         # Decode COSE Sign1
-        decoded = cbor2.loads(sd_kbt)
-        if isinstance(decoded, cbor2.CBORTag) and decoded.tag == 18:
-            cose_sign1 = decoded.value
+        decoded = cbor_utils.decode(sd_kbt)
+        if cbor_utils.is_tag(decoded) and cbor_utils.get_tag_number(decoded) == 18:
+            cose_sign1 = cbor_utils.get_tag_value(decoded)
         else:
             return False, None
 
@@ -191,7 +191,7 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
 
         # Decode protected header
         if protected_header_bytes:
-            protected_header = cbor2.loads(protected_header_bytes)
+            protected_header = cbor_utils.decode(protected_header_bytes)
         else:
             return False, None
 
@@ -207,7 +207,7 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
             return False, None
 
         # Decode payload
-        kbt_claims = cbor2.loads(payload)
+        kbt_claims = cbor_utils.decode(payload)
 
         # Check required claims
         if 3 not in kbt_claims or 6 not in kbt_claims:  # aud and iat

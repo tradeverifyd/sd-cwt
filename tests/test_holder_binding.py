@@ -1,9 +1,9 @@
+from sd_cwt import cbor_utils
 """Tests for mandatory holder binding in SD-CWT."""
 
 import time
 from unittest.mock import patch
 
-import cbor2
 import pytest
 
 from sd_cwt import (
@@ -126,12 +126,12 @@ class TestSDCWTWithHolderBinding:
 
         # Decode and validate SD-CWT
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        assert isinstance(decoded, cbor2.CBORTag)
-        assert decoded.tag == 18  # COSE_Sign1
+        decoded = cbor_utils.decode(sd_cwt)
+        assert cbor_utils.is_tag(decoded)
+        assert cbor_utils.get_tag_number(decoded) == 18  # COSE_Sign1
 
-        cose_sign1 = decoded.value
-        payload = cbor2.loads(cose_sign1[2])
+        cose_sign1 = cbor_utils.get_tag_value(decoded)
+        payload = cbor_utils.decode(cose_sign1[2])
 
         # Verify mandatory cnf claim
         assert validate_sd_cwt_cnf(payload) is True
@@ -166,8 +166,8 @@ class TestSDCWTWithHolderBinding:
 
         # Decode and check cnf claim matches provided key
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         cnf_claim = payload[8]
         holder_key_dict = cose_key_to_dict(holder_key)
@@ -194,8 +194,8 @@ class TestSDCWTWithHolderBinding:
 
         # Decode and check cnf uses thumbprint
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         cnf_claim = payload[8]
         assert 3 in cnf_claim  # ckt (thumbprint)
@@ -295,7 +295,7 @@ class TestSDCWTPresentations:
         assert "Invalid SD-KBT structure" in result["errors"]
 
         # Valid CBOR but wrong structure
-        invalid_structure = cbor2.dumps({"not": "sd_kbt"})
+        invalid_structure = cbor_utils.encode({"not": "sd_kbt"})
         result = validate_sd_cwt_presentation(invalid_structure)
         assert result["valid"] is False
 
@@ -363,8 +363,8 @@ class TestEndToEndHolderBinding:
 
         # Verify mandatory cnf claim
         sd_cwt = sd_cwt_result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
         assert validate_sd_cwt_cnf(payload), "SD-CWT must have cnf claim"
 
         print("\n=== PRESENTATION PHASE ===")
@@ -442,8 +442,8 @@ class TestEndToEndHolderBinding:
 
         # Decode and verify cnf is present
         sd_cwt = result["sd_cwt"]
-        decoded = cbor2.loads(sd_cwt)
-        payload = cbor2.loads(decoded.value[2])
+        decoded = cbor_utils.decode(sd_cwt)
+        payload = cbor_utils.decode(cbor_utils.get_tag_value(decoded)[2])
 
         assert 8 in payload, "cnf claim MUST be present (holder binding is mandatory)"
         assert validate_sd_cwt_cnf(payload), "cnf claim must be valid"

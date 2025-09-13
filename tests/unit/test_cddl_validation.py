@@ -1,48 +1,17 @@
+from sd_cwt import cbor_utils
 """Unit tests for CDDL validation against SD-CWT and COSE Key specifications."""
 
 import base64
 import hashlib
 from typing import Any
 
-import cbor2
-import pycddl
 import pytest
-
-from sd_cwt.cddl_schemas import (
-    COSE_KEY_THUMBPRINT_CDDL,
-    SD_CWT_CDDL,
-    TEST_VECTOR_CDDL,
-)
 from sd_cwt.thumbprint import CoseKeyThumbprint
 
 
 class TestCDDLValidation:
     """Test cases for CDDL schema validation."""
 
-    @pytest.fixture
-    def sd_cwt_schema(self):
-        """Compile SD-CWT CDDL schema."""
-        try:
-            return pycddl.Schema(SD_CWT_CDDL)
-        except Exception:
-            # Return None if compilation fails (pycddl might have issues)
-            return None
-
-    @pytest.fixture
-    def cose_key_schema(self):
-        """Compile COSE Key Thumbprint CDDL schema."""
-        try:
-            return pycddl.Schema(COSE_KEY_THUMBPRINT_CDDL)
-        except Exception:
-            return None
-
-    @pytest.fixture
-    def test_vector_schema(self):
-        """Compile test vector CDDL schema."""
-        try:
-            return pycddl.Schema(TEST_VECTOR_CDDL)
-        except Exception:
-            return None
 
     @pytest.fixture
     def valid_sd_cwt_claims(self) -> dict[str, Any]:
@@ -82,10 +51,10 @@ class TestCDDLValidation:
     def test_sd_cwt_claims_structure(self, valid_sd_cwt_claims: dict[str, Any]):
         """Test SD-CWT claims structure validation."""
         # Encode to CBOR
-        cbor_data = cbor2.dumps(valid_sd_cwt_claims)
+        cbor_data = cbor_utils.encode(valid_sd_cwt_claims)
 
         # Basic validation - check structure
-        decoded = cbor2.loads(cbor_data)
+        decoded = cbor_utils.decode(cbor_data)
         assert 1 in decoded  # iss
         assert 59 in decoded  # redacted_claim_keys
         assert isinstance(decoded[59], list)
@@ -104,8 +73,8 @@ class TestCDDLValidation:
             59: [],  # redacted_claim_keys (empty array)
         }
 
-        cbor_data = cbor2.dumps(claims)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(claims)
+        decoded = cbor_utils.decode(cbor_data)
 
         # Verify all standard claims
         assert decoded[1] == "issuer"
@@ -125,8 +94,8 @@ class TestCDDLValidation:
             "John",  # claim value
         ]
 
-        cbor_data = cbor2.dumps(disclosure)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(disclosure)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert len(decoded) == 3
         assert isinstance(decoded[0], bytes)
@@ -144,8 +113,8 @@ class TestCDDLValidation:
             -3: valid_ec2_key[-3],  # y
         }
 
-        cbor_data = cbor2.dumps(thumbprint_key)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(thumbprint_key)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert decoded[1] == 2  # EC2
         assert decoded[-1] == 1  # P-256
@@ -161,8 +130,8 @@ class TestCDDLValidation:
             -2: valid_okp_key[-2],  # x
         }
 
-        cbor_data = cbor2.dumps(thumbprint_key)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(thumbprint_key)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert decoded[1] == 1  # OKP
         assert decoded[-1] == 6  # Ed25519
@@ -177,8 +146,8 @@ class TestCDDLValidation:
             -2: b"\x01\x00\x01",  # exponent (65537)
         }
 
-        cbor_data = cbor2.dumps(rsa_key)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(rsa_key)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert decoded[1] == 3  # RSA
         assert len(decoded[-1]) == 256  # 2048-bit modulus
@@ -192,8 +161,8 @@ class TestCDDLValidation:
             -1: b"k" * 32,  # key value (256 bits)
         }
 
-        cbor_data = cbor2.dumps(symmetric_key)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(symmetric_key)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert decoded[1] == 4  # Symmetric
         assert len(decoded[-1]) == 32  # 256-bit key
@@ -207,8 +176,8 @@ class TestCDDLValidation:
             3: b"key-id-12345",  # kid
         }
 
-        cbor_data = cbor2.dumps(cnf)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(cnf)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert 1 in decoded  # COSE_Key
         assert 3 in decoded  # kid
@@ -222,8 +191,8 @@ class TestCDDLValidation:
         claims = valid_sd_cwt_claims.copy()
         claims[8] = {1: valid_ec2_key}  # cnf with COSE_Key
 
-        cbor_data = cbor2.dumps(claims)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(claims)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert 8 in decoded  # cnf claim
         assert 1 in decoded[8]  # COSE_Key in cnf
@@ -240,8 +209,8 @@ class TestCDDLValidation:
             "kb_jwt": base64.b64encode(b"key_binding_jwt").decode(),
         }
 
-        cbor_data = cbor2.dumps(presentation)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(presentation)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert "sd_cwt" in decoded
         assert "disclosures" in decoded
@@ -283,8 +252,8 @@ class TestCDDLValidation:
             },
         }
 
-        cbor_data = cbor2.dumps(test_vector)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(test_vector)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert "description" in decoded
         assert "input" in decoded
@@ -312,8 +281,8 @@ class TestCDDLValidation:
             else:  # OKP curves
                 key = {1: 1, -1: crv_id, -2: b"x"}
 
-            cbor_data = cbor2.dumps(key)
-            decoded = cbor2.loads(cbor_data)
+            cbor_data = cbor_utils.encode(key)
+            decoded = cbor_utils.decode(cbor_data)
             assert decoded[-1] == crv_id
 
     @pytest.mark.unit
@@ -331,8 +300,8 @@ class TestCDDLValidation:
 
         for alg_id, _name in algorithms.items():
             key = {1: 2, 3: alg_id}  # Simple key with algorithm
-            cbor_data = cbor2.dumps(key)
-            decoded = cbor2.loads(cbor_data)
+            cbor_data = cbor_utils.encode(key)
+            decoded = cbor_utils.decode(cbor_data)
             assert decoded[3] == alg_id
 
     @pytest.mark.unit
@@ -345,25 +314,9 @@ class TestCDDLValidation:
             "...": True,  # Indicates more undisclosed claims exist
         }
 
-        cbor_data = cbor2.dumps(claims)
-        decoded = cbor2.loads(cbor_data)
+        cbor_data = cbor_utils.encode(claims)
+        decoded = cbor_utils.decode(cbor_data)
 
         assert "..." in decoded
         assert decoded["..."] is True
 
-    @pytest.mark.unit
-    @pytest.mark.skipif(pycddl is None, reason="pycddl not available or not working")
-    def test_pycddl_validation(self, sd_cwt_schema, valid_sd_cwt_claims):
-        """Test actual CDDL validation with pycddl if available."""
-        if sd_cwt_schema is None:
-            pytest.skip("CDDL schema compilation failed")
-
-        cbor_data = cbor2.dumps(valid_sd_cwt_claims)
-
-        try:
-            sd_cwt_schema.validate_cbor(cbor_data, "sd-cwt-claims")
-            assert True  # Validation passed
-        except Exception as e:
-            # pycddl might have compatibility issues
-            print(f"CDDL validation failed: {e}")
-            pass

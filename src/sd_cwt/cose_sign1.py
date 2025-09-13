@@ -6,11 +6,11 @@ that accept signer and verifier functions, allowing keys to be managed externall
 
 from typing import Any, Optional, Protocol
 
-import cbor2
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
+from . import cbor_utils
 
 
 class Signer(Protocol):
@@ -78,7 +78,7 @@ def cose_sign1_sign(
         protected_header[1] = signer.algorithm
 
     # Encode protected header
-    protected_header_bytes = cbor2.dumps(protected_header) if protected_header else b""
+    protected_header_bytes = cbor_utils.encode(protected_header) if protected_header else b""
 
     # Default empty unprotected header
     if unprotected_header is None:
@@ -93,7 +93,7 @@ def cose_sign1_sign(
     ]
 
     # Create signing input
-    signing_input = cbor2.dumps(sig_structure)
+    signing_input = cbor_utils.encode(sig_structure)
 
     # Sign the message
     signature = signer.sign(signing_input)
@@ -107,7 +107,7 @@ def cose_sign1_sign(
     ]
 
     # Encode with COSE_Sign1 tag (18)
-    return cbor2.dumps(cbor2.CBORTag(18, cose_sign1))
+    return cbor_utils.encode(cbor_utils.create_tag(18, cose_sign1))
 
 
 def cose_sign1_verify(
@@ -127,13 +127,13 @@ def cose_sign1_verify(
     """
     try:
         # Decode CBOR
-        decoded = cbor2.loads(cose_sign1_message)
+        decoded = cbor_utils.decode(cose_sign1_message)
 
         # Handle tagged or untagged COSE_Sign1
-        if isinstance(decoded, cbor2.CBORTag):
-            if decoded.tag != 18:
+        if cbor_utils.is_tag(decoded):
+            if cbor_utils.get_tag_number(decoded) != 18:
                 return False, None
-            cose_sign1 = decoded.value
+            cose_sign1 = cbor_utils.get_tag_value(decoded)
         else:
             cose_sign1 = decoded
 
@@ -152,14 +152,14 @@ def cose_sign1_verify(
         ]
 
         # Create signing input
-        signing_input = cbor2.dumps(sig_structure)
+        signing_input = cbor_utils.encode(sig_structure)
 
         # Verify signature
         if verifier.verify(signing_input, signature):
             return True, payload
         return False, None
 
-    except (ValueError, TypeError, cbor2.CBORDecodeError):
+    except (ValueError, TypeError, cbor_utils.CBORDecodeError):
         return False, None
 
 

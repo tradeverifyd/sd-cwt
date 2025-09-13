@@ -1,9 +1,9 @@
+from . import cbor_utils
 """COSE Key Thumbprint computation according to RFC 9679."""
 
 import hashlib
 from typing import Any
 
-import cbor2
 
 
 class CoseKeyThumbprint:
@@ -53,7 +53,7 @@ class CoseKeyThumbprint:
         sorted_key = dict(sorted(filtered_key.items()))
 
         # Encode to CBOR
-        return cbor2.dumps(sorted_key, canonical=True)
+        return cbor_utils.encode(sorted_key, canonical=True)
 
     @staticmethod
     def compute(cose_key: dict[int, Any], hash_alg: str = "sha256") -> bytes:

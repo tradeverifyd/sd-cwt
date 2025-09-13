@@ -1,9 +1,9 @@
+from sd_cwt import cbor_utils
 """Unit tests for selective disclosure functionality."""
 
 import hashlib
 from typing import Any
 
-import cbor2
 import pytest
 
 
@@ -29,7 +29,7 @@ class TestSelectiveDisclosure:
         """Test hashing a disclosure array."""
         for disclosure in disclosure_array:
             # Encode disclosure as CBOR
-            encoded = cbor2.dumps(disclosure)
+            encoded = cbor_utils.encode(disclosure)
 
             # Hash the encoded disclosure
             hash_value = hashlib.sha256(encoded).digest()
@@ -73,7 +73,7 @@ class TestSelectiveDisclosure:
     def test_create_sd_hash_digest(self):
         """Test creating SD hash digest from disclosure."""
         disclosure = ["salt123", "claim_name", "claim_value"]
-        encoded = cbor2.dumps(disclosure)
+        encoded = cbor_utils.encode(disclosure)
         digest = hashlib.sha256(encoded).digest()
 
         # Convert to base64url for inclusion in SD array
@@ -91,7 +91,7 @@ class TestSelectiveDisclosure:
         """Test handling multiple disclosures."""
         hashes = []
         for disclosure in disclosure_array:
-            encoded = cbor2.dumps(disclosure)
+            encoded = cbor_utils.encode(disclosure)
             hash_value = hashlib.sha256(encoded).digest()
             hashes.append(hash_value)
 

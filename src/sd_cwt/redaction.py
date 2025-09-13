@@ -4,8 +4,7 @@ import hashlib
 import secrets
 from typing import Any, Optional, Protocol
 
-import cbor2
-import cbor_diag  # type: ignore[import-untyped]
+from . import cbor_utils, edn_utils
 
 
 # CBOR tags for redaction (from SD-CWT spec)
@@ -83,7 +82,7 @@ def parse_edn_to_cbor(edn_string: str) -> bytes:
     Returns:
         CBOR-encoded bytes
     """
-    return cbor_diag.diag2cbor(edn_string)
+    return edn_utils.diag_to_cbor(edn_string)
 
 
 def cbor_to_dict(cbor_bytes: bytes) -> dict[Any, Any]:
@@ -95,7 +94,7 @@ def cbor_to_dict(cbor_bytes: bytes) -> dict[Any, Any]:
     Returns:
         Decoded dictionary
     """
-    return cbor2.loads(cbor_bytes)
+    return cbor_utils.decode(cbor_bytes)
 
 
 def generate_salt(length: int = 16, salt_generator: Optional[SaltGenerator] = None) -> bytes:
@@ -127,7 +126,7 @@ def create_disclosure(salt: bytes, claim_name: Any, claim_value: Any) -> bytes:
         CBOR-encoded disclosure array
     """
     disclosure_array = [salt, claim_value, claim_name]
-    return cbor2.dumps(disclosure_array)
+    return cbor_utils.encode(disclosure_array)
 
 
 def hash_disclosure(disclosure: bytes, hash_alg: str = "sha-256") -> bytes:
@@ -189,7 +188,7 @@ def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
                     continue
 
                 # Check if value is tagged for redaction
-                if isinstance(value, cbor2.CBORTag):
+                if cbor_utils.is_tag(value):
                     if value.tag == REDACTED_CLAIM_KEY_TAG:
                         # This is a redacted claim - the key should be redacted
                         redacted.append((path, key))
@@ -202,7 +201,7 @@ def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
 
         elif isinstance(obj, list):
             for i, item in enumerate(obj):
-                if isinstance(item, cbor2.CBORTag) and item.tag == REDACTED_CLAIM_ELEMENT_TAG:
+                if cbor_utils.is_tag(item, REDACTED_CLAIM_ELEMENT_TAG):
                     redacted.append((path + [i], item.value))
                 elif isinstance(item, (dict, list)):
                     _traverse(item, path + [i])
@@ -232,7 +231,7 @@ def process_redactions(
             return {k: deep_copy_claims(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [deep_copy_claims(item) for item in obj]
-        elif isinstance(obj, cbor2.CBORTag):
+        elif cbor_utils.is_tag(obj):
             # Unwrap CBOR tags during copy
             return deep_copy_claims(obj.value)
         else:
@@ -328,7 +327,7 @@ def build_sd_cwt_claims(
 
     if sd_hashes:
         # Use CBOR simple value 59 as the key for redacted claim hashes
-        sd_cwt_claims[cbor2.CBORSimpleValue(59)] = sd_hashes
+        sd_cwt_claims[cbor_utils.create_simple_value(59)] = sd_hashes
 
     return sd_cwt_claims
 
@@ -368,6 +367,6 @@ def edn_to_redacted_cbor(
     sd_cwt_claims = build_sd_cwt_claims(redacted_claims, hashes)
 
     # Encode to CBOR
-    cbor_claims = cbor2.dumps(sd_cwt_claims)
+    cbor_claims = cbor_utils.encode(sd_cwt_claims)
 
     return cbor_claims, disclosures

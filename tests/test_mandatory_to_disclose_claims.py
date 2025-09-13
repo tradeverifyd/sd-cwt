@@ -1,6 +1,6 @@
+from sd_cwt import cbor_utils
 """Tests to verify that mandatory-to-disclose claims are never redacted."""
 
-import cbor2
 import pytest
 
 from sd_cwt import SeededSaltGenerator, edn_to_redacted_cbor
@@ -26,7 +26,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims, seeded_gen)
 
         # Parse claims
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # cnf claim (8) should still be present - not redacted
         assert 8 in claims, "cnf claim must never be redacted"
@@ -36,7 +36,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         assert len(disclosures) == 1, "Only non-mandatory-to-disclose claims should be redacted"
 
         # Decode the disclosure to verify it's the email
-        disclosure = cbor2.loads(disclosures[0])
+        disclosure = cbor_utils.decode(disclosures[0])
         assert disclosure[2] == "email", "Only email should be disclosed"
 
     def test_standard_claims_protection(self) -> None:
@@ -58,7 +58,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         seeded_gen = SeededSaltGenerator(seed=123)
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims, seeded_gen)
 
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # All standard claims should be preserved
         assert 1 in claims, "iss claim must not be redacted"
@@ -87,7 +87,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
 
         # Only custom claim should be redacted
         assert len(disclosures) == 1, "Only custom claim should be redacted"
-        disclosure = cbor2.loads(disclosures[0])
+        disclosure = cbor_utils.decode(disclosures[0])
         assert disclosure[2] == "custom", "Custom claim should be disclosed"
 
     def test_all_protected_claims_list(self) -> None:
@@ -107,7 +107,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         """
 
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims)
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # No claims should be redacted
         assert len(disclosures) == 0, "No mandatory-to-disclose claims should be redacted"
@@ -139,7 +139,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         """
 
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims)
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # Subject should be redacted
         assert 2 not in claims, "Subject claim should be redacted when tagged"
@@ -150,7 +150,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         # Verify both disclosures
         disclosure_names = []
         for disclosure_bytes in disclosures:
-            disclosure = cbor2.loads(disclosure_bytes)
+            disclosure = cbor_utils.decode(disclosure_bytes)
             disclosure_names.append(disclosure[2])
 
         assert 2 in disclosure_names, "Subject claim should be in disclosures"
@@ -175,7 +175,7 @@ class TestMandatoryToDiscloseClaimsRedaction:
         """
 
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_claims)
-        claims = cbor2.loads(cbor_claims)
+        claims = cbor_utils.decode(cbor_claims)
 
         # Top-level iss should be preserved
         assert 1 in claims, "Top-level iss should be mandatory to disclose"

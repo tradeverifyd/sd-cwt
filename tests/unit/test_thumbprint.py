@@ -1,9 +1,9 @@
+from sd_cwt import cbor_utils
 """Unit tests for COSE Key Thumbprint computation (RFC 9679)."""
 
 import base64
 from typing import Any
 
-import cbor2
 import pytest
 
 from sd_cwt.thumbprint import CoseKeyThumbprint
@@ -68,7 +68,7 @@ class TestCoseKeyThumbprint:
         assert isinstance(canonical, bytes)
 
         # Decode and verify only required fields are present
-        decoded = cbor2.loads(canonical)
+        decoded = cbor_utils.decode(canonical)
         assert 1 in decoded  # kty
         assert -1 in decoded  # crv
         assert -2 in decoded  # x
@@ -86,7 +86,7 @@ class TestCoseKeyThumbprint:
         assert isinstance(canonical, bytes)
 
         # Decode and verify only required fields are present
-        decoded = cbor2.loads(canonical)
+        decoded = cbor_utils.decode(canonical)
         assert 1 in decoded  # kty
         assert -1 in decoded  # crv
         assert -2 in decoded  # x
@@ -100,7 +100,7 @@ class TestCoseKeyThumbprint:
         assert isinstance(canonical, bytes)
 
         # Decode and verify only required fields are present
-        decoded = cbor2.loads(canonical)
+        decoded = cbor_utils.decode(canonical)
         assert 1 in decoded  # kty
         assert -1 in decoded  # n
         assert -2 in decoded  # e
@@ -114,7 +114,7 @@ class TestCoseKeyThumbprint:
         assert isinstance(canonical, bytes)
 
         # Decode and verify only required fields are present
-        decoded = cbor2.loads(canonical)
+        decoded = cbor_utils.decode(canonical)
         assert 1 in decoded  # kty
         assert -1 in decoded  # k
         assert 3 not in decoded  # alg should be excluded
