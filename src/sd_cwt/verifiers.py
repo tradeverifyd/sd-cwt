@@ -185,10 +185,31 @@ def get_presentation_verifier(
 
     # Check if cnf contains a key thumbprint (key 3) for resolution
     if 3 in cnf_claim:  # COSE Key Thumbprint
-        # Use the provided holder key resolver
+        # Use the provided holder key resolver to get the actual key
         if holder_key_resolver is None:
             raise ValueError("holder_key_resolver is required for thumbprint-based cnf claims")
-        return PresentationVerifier(holder_key_resolver)
+
+        # Extract the thumbprint from cnf claim
+        holder_ckt = cnf_claim[3]  # COSE Key Thumbprint from cnf
+
+        # Resolve the actual key using the thumbprint
+        try:
+            holder_key = holder_key_resolver(holder_ckt)
+        except ValueError:
+            return None  # Key not found in resolver
+
+        # Create a resolver for KBT verification using the resolved key's thumbprint
+        from .thumbprint import CoseKeyThumbprint
+
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key, "sha256")
+
+        def ckt_based_resolver(kid: bytes) -> dict[int, Any]:
+            # KBTs should use the key's computed thumbprint as kid
+            if kid == holder_thumbprint:
+                return holder_key
+            raise ValueError(f"Key not found: {kid.hex()}")
+
+        return PresentationVerifier(ckt_based_resolver)
     elif 1 in cnf_claim:  # Full COSE key embedded - create single-key resolver
         holder_key = cnf_claim[1]
         # Create a simple resolver for this embedded key using its thumbprint as kid
