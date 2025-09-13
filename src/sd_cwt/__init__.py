@@ -30,13 +30,16 @@ from .verifiers import (
     PresentationVerifier,
     get_presentation_verifier,
 )
+from .signers import (
+    CredentialSigner,
+    PresentationSigner,
+    create_credential_signer,
+    create_presentation_signer,
+)
 
 # Hide module imports
-del cose_keys
-del cose_sign1
-del redaction
-del sd_cwt
-del verifiers
+from . import cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers
+del cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers
 
 __version__ = "0.1.0"
 
@@ -70,4 +73,9 @@ __all__ = [
     "CredentialVerifier",
     "PresentationVerifier",
     "get_presentation_verifier",
+    # Signers for safe credential and presentation signing
+    "CredentialSigner",
+    "PresentationSigner",
+    "create_credential_signer",
+    "create_presentation_signer",
 ]

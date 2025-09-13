@@ -3,13 +3,15 @@
 import time
 
 from sd_cwt import (
+    CredentialSigner,
     CredentialVerifier,
+    PresentationSigner,
     PresentationVerifier,
     cbor_utils,
     cose_key_generate,
     get_presentation_verifier,
 )
-from sd_cwt.cose_sign1 import ES256Signer, cose_sign1_sign
+from sd_cwt.cose_sign1 import cose_sign1_sign
 from sd_cwt.holder_binding import create_cnf_claim, create_sd_kbt, validate_sd_kbt_structure
 
 
@@ -61,7 +63,7 @@ class TestKeyBindingToken:
 
         # Create issuer signer
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        issuer_signer = ES256Signer(issuer_key_dict[-4])
+        issuer_signer = CredentialSigner(issuer_key_dict)
 
         # Create basic claims with holder confirmation (no redaction)
         current_time = int(time.time())
@@ -129,7 +131,7 @@ class TestKeyBindingToken:
 
         # Create holder signer from private key
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
-        holder_signer = ES256Signer(holder_key_dict[-4])
+        holder_signer = PresentationSigner(holder_key_dict)
 
         # Create KBT parameters
         verifier_audience = "https://verifier.example/api"
@@ -226,7 +228,7 @@ class TestKeyBindingToken:
         # Step 2: Create SD-CWT with holder binding (no redaction)
         issuer_key_cbor = cose_key_generate()
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        issuer_signer = ES256Signer(issuer_key_dict[-4])
+        issuer_signer = CredentialSigner(issuer_key_dict)
 
         cnf_claim = create_cnf_claim(holder_key_cbor, use_thumbprint=False)
         current_time = int(time.time())
@@ -246,7 +248,7 @@ class TestKeyBindingToken:
                                  protected_header=protected_header)
 
         # Step 3: Create Key Binding Token (KBT)
-        holder_signer = ES256Signer(holder_key_dict[-4])
+        holder_signer = PresentationSigner(holder_key_dict)
 
         sd_kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt,
@@ -273,7 +275,7 @@ class TestKeyBindingToken:
 
         # Create holder signer
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
-        holder_signer = ES256Signer(holder_key_dict[-4])
+        holder_signer = PresentationSigner(holder_key_dict)
 
         # Create KBT without cnonce
         sd_kbt = create_sd_kbt(
@@ -298,8 +300,8 @@ class TestKeyBindingToken:
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
 
-        issuer_signer = ES256Signer(issuer_key_dict[-4])
-        holder_signer = ES256Signer(holder_key_dict[-4])
+        issuer_signer = CredentialSigner(issuer_key_dict)
+        holder_signer = PresentationSigner(holder_key_dict)
 
         # Create SD-CWT with thumbprint-based cnf claim (smaller size)
         cnf_claim = create_cnf_claim(holder_key_cbor, use_thumbprint=True)
@@ -355,7 +357,7 @@ class TestKeyBindingToken:
 
         # Step 4: Create KBT using holder's private key
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
-        holder_signer = ES256Signer(holder_key_dict[-4])
+        holder_signer = PresentationSigner(holder_key_dict)
 
         expected_audience = "https://verifier.example/presentation"
         sd_kbt = create_sd_kbt(
