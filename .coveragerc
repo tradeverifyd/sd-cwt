@@ -1,0 +1,40 @@
+[run]
+branch = True
+source = src/sd_cwt
+omit = 
+    */tests/*
+    */__init__.py
+    */conftest.py
+    */.venv/*
+    */venv/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    pass
+    ...
+
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = True
+sort = Cover
+
+[html]
+directory = htmlcov
+title = SD-CWT Coverage Report
+
+[xml]
+output = coverage.xml
+
+[json]
+output = coverage.json
+pretty_print = True
