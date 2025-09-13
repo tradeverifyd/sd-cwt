@@ -25,12 +25,18 @@ from .sd_cwt import (
     validate_sd_cwt_presentation,
     extract_verified_claims,
 )
+from .verifiers import (
+    CredentialVerifier,
+    PresentationVerifier,
+    get_presentation_verifier,
+)
 
 # Hide module imports
 del cose_keys
 del cose_sign1
 del redaction
 del sd_cwt
+del verifiers
 
 __version__ = "0.1.0"
 
@@ -60,4 +66,8 @@ __all__ = [
     "create_sd_cwt_presentation",
     "validate_sd_cwt_presentation",
     "extract_verified_claims",
+    # Verifiers for safe credential and presentation verification
+    "CredentialVerifier",
+    "PresentationVerifier",
+    "get_presentation_verifier",
 ]

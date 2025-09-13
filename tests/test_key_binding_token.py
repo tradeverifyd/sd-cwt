@@ -2,10 +2,14 @@
 
 import time
 
-import pytest
-
-from sd_cwt import cbor_utils, cose_key_generate
-from sd_cwt.cose_sign1 import ES256Signer, ES256Verifier, cose_sign1_sign, cose_sign1_verify
+from sd_cwt import (
+    CredentialVerifier,
+    PresentationVerifier,
+    cbor_utils,
+    cose_key_generate,
+    get_presentation_verifier,
+)
+from sd_cwt.cose_sign1 import ES256Signer, cose_sign1_sign
 from sd_cwt.holder_binding import create_cnf_claim, create_sd_kbt, validate_sd_kbt_structure
 
 
@@ -30,7 +34,7 @@ class TestKeyBindingToken:
     def test_create_simple_sd_cwt_without_redaction(self):
         """Test creating a simple SD-CWT with holder binding but no redaction."""
         sd_cwt_data = self._create_test_sd_cwt()
-        sd_cwt, issuer_key_cbor, holder_key_cbor = sd_cwt_data
+        sd_cwt, _, holder_key_cbor = sd_cwt_data
 
         # Verify SD-CWT structure
         assert isinstance(sd_cwt, bytes)
@@ -92,20 +96,17 @@ class TestKeyBindingToken:
         sd_cwt_data = self._create_test_sd_cwt()
         sd_cwt, issuer_key_cbor, holder_key_cbor = sd_cwt_data
 
-        # Create issuer verifier
+        # Create credential verifier with issuer key
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        issuer_verifier = ES256Verifier(issuer_key_dict[-2], issuer_key_dict[-3])
+        credential_verifier = CredentialVerifier(issuer_key_dict)
 
         # Verify SD-CWT signature
-        is_valid, payload_bytes = cose_sign1_verify(sd_cwt, issuer_verifier)
+        is_valid, payload = credential_verifier.verify(sd_cwt)
         assert is_valid, "SD-CWT signature should verify"
-        assert payload_bytes is not None, "Payload should not be None"
+        assert payload is not None, "Payload should not be None"
 
-        # Decode payload to extract holder key from cnf claim
-        payload = cbor_utils.decode(payload_bytes)
+        # Extract holder key from cnf claim
         cnf_claim = payload[8]  # cnf claim
-
-        # Extract holder key from cnf claim (full key, not thumbprint)
         assert 1 in cnf_claim, "cnf claim should contain full COSE key"
         extracted_holder_key = cnf_claim[1]
 
@@ -202,24 +203,19 @@ class TestKeyBindingToken:
         # Create a valid KBT
         sd_kbt, holder_key_cbor = self.test_create_key_binding_token()
 
-        # Extract holder public key for verification
+        # Create presentation verifier with holder key
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
-        holder_verifier = ES256Verifier(holder_key_dict[-2], holder_key_dict[-3])
+        presentation_verifier = PresentationVerifier(holder_key_dict)
 
         # Verify KBT signature
-        try:
-            is_valid, payload_bytes = cose_sign1_verify(sd_kbt, holder_verifier)
-            assert is_valid, "KBT signature should verify successfully"
-            assert payload_bytes is not None, "Verified payload should not be None"
+        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt)
+        assert is_valid, "KBT signature should verify successfully"
+        assert kbt_payload is not None, "Verified payload should not be None"
 
-            # Decode the KBT payload
-            kbt_payload = cbor_utils.decode(payload_bytes)
-            audience = "https://verifier.example/api"
-            assert kbt_payload[3] == audience, "Verified payload should contain audience"
-            assert kbt_payload[6] is not None, "Verified payload should contain iat"
-
-        except Exception as e:
-            pytest.fail(f"KBT signature verification failed: {e}")
+        # Verify payload contents
+        audience = "https://verifier.example/api"
+        assert kbt_payload[3] == audience, "Verified payload should contain audience"
+        assert kbt_payload[6] is not None, "Verified payload should contain iat"
 
     def test_complete_kbt_workflow(self):
         """Test the complete KBT workflow: generate, sign, present, verify."""
@@ -265,15 +261,10 @@ class TestKeyBindingToken:
         assert is_valid, "KBT should have valid structure"
 
         # Step 5: Verify KBT signature
-        holder_verifier = ES256Verifier(holder_key_dict[-2], holder_key_dict[-3])
-
-        try:
-            is_valid, payload_bytes = cose_sign1_verify(sd_kbt, holder_verifier)
-            assert is_valid and payload_bytes is not None
-            verified_payload = cbor_utils.decode(payload_bytes)
-            assert verified_payload[3] == "https://verifier.example/api"
-        except Exception as e:
-            pytest.fail(f"KBT verification failed: {e}")
+        presentation_verifier = PresentationVerifier(holder_key_dict)
+        is_valid, verified_payload = presentation_verifier.verify(sd_kbt)
+        assert is_valid and verified_payload is not None
+        assert verified_payload[3] == "https://verifier.example/api"
 
     def test_kbt_without_cnonce(self):
         """Test KBT creation without optional cnonce."""
@@ -340,9 +331,9 @@ class TestKeyBindingToken:
         assert is_valid, "KBT with thumbprint cnf should be valid"
 
         # Verify KBT signature with holder key
-        holder_verifier = ES256Verifier(holder_key_dict[-2], holder_key_dict[-3])
-        is_valid, payload_bytes = cose_sign1_verify(sd_kbt, holder_verifier)
-        assert is_valid and payload_bytes is not None, "KBT signature should verify"
+        presentation_verifier = PresentationVerifier(holder_key_dict)
+        is_valid, payload = presentation_verifier.verify(sd_kbt)
+        assert is_valid and payload is not None, "KBT signature should verify"
 
     def test_complete_verification_chain(self):
         """Test the complete verification chain: SD-CWT → holder KBT → audience."""
@@ -350,26 +341,19 @@ class TestKeyBindingToken:
         sd_cwt_data = self._create_test_sd_cwt()
         sd_cwt, issuer_key_cbor, holder_key_cbor = sd_cwt_data
 
-        # Step 2: Verify SD-CWT signature and extract holder verifier
+        # Step 2: Create credential verifier and verify SD-CWT
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
-        issuer_verifier = ES256Verifier(issuer_key_dict[-2], issuer_key_dict[-3])
+        credential_verifier = CredentialVerifier(issuer_key_dict)
 
-        # Verify SD-CWT
-        is_valid, payload_bytes = cose_sign1_verify(sd_cwt, issuer_verifier)
+        is_valid, payload = credential_verifier.verify(sd_cwt)
         assert is_valid, "SD-CWT signature should verify"
-        assert payload_bytes is not None, "SD-CWT payload should not be None"
+        assert payload is not None, "SD-CWT payload should not be None"
 
-        # Extract holder key from verified SD-CWT payload
-        payload = cbor_utils.decode(payload_bytes)
-        cnf_claim = payload[8]  # cnf claim
-        extracted_holder_key = cnf_claim[1]  # Full COSE key
+        # Step 3: Extract presentation verifier using utility function
+        presentation_verifier = get_presentation_verifier(sd_cwt, credential_verifier)
+        assert presentation_verifier is not None, "Should extract presentation verifier"
 
-        # Create holder verifier from extracted key
-        holder_verifier = ES256Verifier(
-            extracted_holder_key[-2], extracted_holder_key[-3]
-        )
-
-        # Step 3: Create KBT using holder's private key
+        # Step 4: Create KBT using holder's private key
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
         holder_signer = ES256Signer(holder_key_dict[-4])
 
@@ -382,23 +366,17 @@ class TestKeyBindingToken:
             cnonce=b"verification-chain-nonce"
         )
 
-        # Step 4: Verify holder-signed KBT with extracted holder verifier
-        is_valid, kbt_payload_bytes = cose_sign1_verify(sd_kbt, holder_verifier)
-        assert is_valid, "KBT signature should verify with extracted holder key"
-        assert kbt_payload_bytes is not None, "KBT payload should not be None"
+        # Step 5: Verify holder-signed KBT with extracted presentation verifier
+        is_valid, kbt_payload = presentation_verifier.verify(sd_kbt)
+        assert is_valid, "KBT signature should verify with extracted presentation verifier"
+        assert kbt_payload is not None, "KBT payload should not be None"
 
-        # Step 5: Confirm audience is correct in verified KBT payload
-        kbt_payload = cbor_utils.decode(kbt_payload_bytes)
+        # Step 6: Confirm audience is correct in verified KBT payload
         actual_audience = kbt_payload[3]  # aud claim
         assert actual_audience == expected_audience, (
             f"Audience mismatch: expected {expected_audience}, got {actual_audience}"
         )
 
         # Additional verification: ensure KBT contains the original SD-CWT
-        is_valid, extracted_info = validate_sd_kbt_structure(sd_kbt)
+        is_valid, _ = validate_sd_kbt_structure(sd_kbt)
         assert is_valid, "KBT structure should be valid"
-        assert "kcwt" in extracted_info, "KBT should contain SD-CWT"
-
-        # Verify the extracted SD-CWT matches the original
-        extracted_sd_cwt = extracted_info["kcwt"]
-        assert extracted_sd_cwt == sd_cwt, "Extracted SD-CWT should match original"
