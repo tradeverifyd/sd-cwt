@@ -218,6 +218,47 @@ thumbprint-uri = tstr .regexp "urn:ietf:params:oauth:ckt:(sha256|sha384|sha512):
 canonical-cose-key = okp-thumbprint / ec2-thumbprint / rsa-thumbprint / symmetric-thumbprint
 """
 
+# CDDL for verified claims (closed claimset after verification)
+VERIFIED_CLAIMS_CDDL = """
+; Verified Claims CDDL Schema
+; This schema validates the closed claimset that a verifier obtains
+; after successfully validating an SD-CWT presentation.
+;
+; Using wildcard approach to work around zcbor limitations with complex schemas
+
+verified-claims = {
+    ; Standard CWT claims (mandatory-to-disclose)
+    1: tstr,        ; iss - issuer (always mandatory)
+    ? 2: tstr,      ; sub - subject (can be disclosed)
+    ? 3: tstr,      ; aud - audience (mandatory if present)
+    ? 4: int,       ; exp - expiration (mandatory if present)
+    ? 5: int,       ; nbf - not before (mandatory if present)
+    ? 6: int,       ; iat - issued at (mandatory if present)
+    ? 7: bstr,      ; cti - CWT ID (mandatory if present)
+    8: cnf-claim,   ; cnf - confirmation (always mandatory)
+    ? 39: bstr,     ; cnonce - client nonce (mandatory if present)
+
+    ; Allow any string keys with any value types (custom claims)
+    * tstr => any,
+}
+
+; Confirmation claim structure - only validate well-formed COSE keys
+cnf-claim = {
+    ? 1: cose-key,        ; Full COSE key (well-formed)
+    ? 3: bstr,            ; COSE key thumbprint
+}
+
+; Well-formed COSE key structure
+cose-key = {
+    1: int,               ; kty - key type (required)
+    ? 3: int,             ; alg - algorithm
+    ? -1: int,            ; crv - curve (for EC keys)
+    ? -2: bstr,           ; x - x coordinate
+    ? -3: bstr,           ; y - y coordinate (for EC2 keys)
+    ? -4: bstr,           ; d - private key (should not be present in cnf)
+}
+"""
+
 # Combined CDDL for full SD-CWT with COSE keys
 COMBINED_CDDL = (
     """
@@ -230,6 +271,11 @@ COMBINED_CDDL = (
 ; COSE Key definition for use in cnf claim
 """
     + COSE_KEY_THUMBPRINT_CDDL
+    + """
+
+; Verified claims schema for verifier validation
+"""
+    + VERIFIED_CLAIMS_CDDL
 )
 
 # Additional CDDL for test vectors

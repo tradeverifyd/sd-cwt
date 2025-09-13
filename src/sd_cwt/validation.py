@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import cbor2
 import cbor_diag  # type: ignore[import-untyped]
-import pycddl  # type: ignore[import-untyped]
+import zcbor  # type: ignore[import-untyped]
 
 
 class CBORValidator:
@@ -113,9 +113,9 @@ class CDDLValidator:
     def _compile_schema(self) -> None:
         """Compile the CDDL schema."""
         try:
-            self.validator = pycddl.Schema(self.schema)
+            self.validator = zcbor.DataTranslator.from_cddl(self.schema, default_max_qty=100)
         except Exception as e:
-            print(f"Failed to compile CDDL schema: {e}")
+            print(f"Failed to compile CDDL schema with zcbor: {e}")
             self.validator = None
 
     def validate(self, cbor_data: bytes, type_name: str = "sd-cwt") -> bool:
@@ -132,7 +132,12 @@ class CDDLValidator:
             return False
 
         try:
-            self.validator.validate_cbor(cbor_data, type_name)
+            # Decode CBOR data first
+            decoded_data = cbor2.loads(cbor_data)
+
+            # Use zcbor to validate the data structure
+            type_obj = self.validator.my_types[type_name]
+            type_obj.validate_obj(decoded_data)
             return True
         except Exception:
             return False

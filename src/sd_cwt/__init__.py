@@ -24,6 +24,7 @@ from .sd_cwt import (
     create_sd_cwt_with_holder_binding,
     create_sd_cwt_presentation,
     validate_sd_cwt_presentation,
+    extract_verified_claims,
 )
 
 # Hide module imports
@@ -61,4 +62,5 @@ __all__ = [
     "create_sd_cwt_with_holder_binding",
     "create_sd_cwt_presentation",
     "validate_sd_cwt_presentation",
+    "extract_verified_claims",
 ]

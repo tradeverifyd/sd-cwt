@@ -221,3 +221,69 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
         result["errors"].append(f"Validation error: {str(e)}")
 
     return result
+
+
+def extract_verified_claims(sd_kbt: bytes) -> dict[str, Any]:
+    """Extract verified claims from a validated SD-CWT presentation.
+
+    This function returns a closed claimset with no redacted elements,
+    suitable for CDDL validation by a verifier.
+
+    Args:
+        sd_kbt: CBOR-encoded SD-KBT (validated presentation)
+
+    Returns:
+        Dictionary containing:
+        - valid: Boolean indicating if extraction succeeded
+        - claims: Complete claims map with disclosed values (if valid)
+        - errors: List of errors encountered
+    """
+    result = {
+        "valid": False,
+        "claims": {},
+        "errors": []
+    }
+
+    # First validate the presentation
+    validation_result = validate_sd_cwt_presentation(sd_kbt)
+    if not validation_result["valid"]:
+        result["errors"] = validation_result["errors"]
+        return result
+
+    try:
+        # Extract SD-CWT and disclosures from validated result
+        sd_cwt = validation_result["sd_cwt"]
+        disclosures = validation_result["disclosures"]
+
+        # Decode the SD-CWT to get base claims
+        decoded_sd_cwt = cbor2.loads(sd_cwt)
+        if isinstance(decoded_sd_cwt, cbor2.CBORTag) and decoded_sd_cwt.tag == 18:
+            cose_sign1 = decoded_sd_cwt.value
+            base_claims = cbor2.loads(cose_sign1[2])  # payload
+        else:
+            result["errors"].append("Invalid SD-CWT structure")
+            return result
+
+        # Start with base claims (non-redacted)
+        verified_claims = base_claims.copy()
+
+        # Remove the redacted claim hashes (simple value 59) - these are replaced by actual claims
+        simple_59 = cbor2.CBORSimpleValue(59)
+        if simple_59 in verified_claims:
+            del verified_claims[simple_59]
+
+        # Add disclosed claims from disclosures
+        for disclosure_bytes in disclosures:
+            disclosure = cbor2.loads(disclosure_bytes)
+            # SD-CWT disclosure format: [salt, claim_value, claim_name]
+            claim_name = disclosure[2]  # claim key
+            claim_value = disclosure[1]  # claim value
+            verified_claims[claim_name] = claim_value
+
+        result["valid"] = True
+        result["claims"] = verified_claims
+
+    except Exception as e:
+        result["errors"].append(f"Claims extraction error: {str(e)}")
+
+    return result
