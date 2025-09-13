@@ -20,11 +20,17 @@ from .redaction import (
     SaltGenerator,
     edn_to_redacted_cbor,
 )
+from .sd_cwt import (
+    create_sd_cwt_with_holder_binding,
+    create_sd_cwt_presentation,
+    validate_sd_cwt_presentation,
+)
 
 # Hide module imports
 del cose_keys
 del cose_sign1
 del redaction
+del sd_cwt
 
 __version__ = "0.1.0"
 
@@ -51,4 +57,8 @@ __all__ = [
     "SaltGenerator",
     "SecureSaltGenerator",
     "SeededSaltGenerator",
+    # SD-CWT with mandatory holder binding
+    "create_sd_cwt_with_holder_binding",
+    "create_sd_cwt_presentation",
+    "validate_sd_cwt_presentation",
 ]

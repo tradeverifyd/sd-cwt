@@ -39,11 +39,15 @@ class CoseEllipticCurve(IntEnum):
     Ed448 = 7    # Ed448 for EdDSA
 
 
-def cose_key_generate(algorithm: CoseAlgorithm = CoseAlgorithm.ES256) -> bytes:
+def cose_key_generate(
+    algorithm: CoseAlgorithm = CoseAlgorithm.ES256,
+    key_id: Optional[bytes] = None
+) -> bytes:
     """Generate a COSE key pair in CBOR format.
 
     Args:
         algorithm: The COSE algorithm to use (defaults to ES256)
+        key_id: Optional key identifier (kid parameter)
 
     Returns:
         CBOR-encoded COSE_Key containing both private and public key material
@@ -52,26 +56,32 @@ def cose_key_generate(algorithm: CoseAlgorithm = CoseAlgorithm.ES256) -> bytes:
         ValueError: If the algorithm is not supported
     """
     if algorithm == CoseAlgorithm.ES256:
-        return _generate_ec_key(ec.SECP256R1(), CoseEllipticCurve.P256, algorithm)
+        return _generate_ec_key(ec.SECP256R1(), CoseEllipticCurve.P256, algorithm, key_id)
     elif algorithm == CoseAlgorithm.ES384:
-        return _generate_ec_key(ec.SECP384R1(), CoseEllipticCurve.P384, algorithm)
+        return _generate_ec_key(ec.SECP384R1(), CoseEllipticCurve.P384, algorithm, key_id)
     elif algorithm == CoseAlgorithm.ES512:
-        return _generate_ec_key(ec.SECP521R1(), CoseEllipticCurve.P521, algorithm)
+        return _generate_ec_key(ec.SECP521R1(), CoseEllipticCurve.P521, algorithm, key_id)
     elif algorithm in (CoseAlgorithm.EdDSA, CoseAlgorithm.Ed25519):
-        return _generate_okp_key(ed25519.Ed25519PrivateKey, CoseEllipticCurve.Ed25519, algorithm)
+        return _generate_okp_key(ed25519.Ed25519PrivateKey, CoseEllipticCurve.Ed25519, algorithm, key_id)
     elif algorithm == CoseAlgorithm.Ed448:
-        return _generate_okp_key(ed448.Ed448PrivateKey, CoseEllipticCurve.Ed448, algorithm)
+        return _generate_okp_key(ed448.Ed448PrivateKey, CoseEllipticCurve.Ed448, algorithm, key_id)
     else:
         raise ValueError(f"Unsupported algorithm: {algorithm}")
 
 
-def _generate_ec_key(curve: ec.EllipticCurve, crv_id: CoseEllipticCurve, alg: CoseAlgorithm) -> bytes:
+def _generate_ec_key(
+    curve: ec.EllipticCurve,
+    crv_id: CoseEllipticCurve,
+    alg: CoseAlgorithm,
+    key_id: Optional[bytes] = None
+) -> bytes:
     """Generate an EC2 COSE key.
 
     Args:
         curve: The elliptic curve to use
         crv_id: COSE curve identifier
         alg: COSE algorithm identifier
+        key_id: Optional key identifier
 
     Returns:
         CBOR-encoded COSE_Key
@@ -111,16 +121,26 @@ def _generate_ec_key(curve: ec.EllipticCurve, crv_id: CoseEllipticCurve, alg: Co
         -4: d,               # d: private key
     }
 
+    # Add key ID if provided
+    if key_id is not None:
+        cose_key[2] = key_id  # kid: Key ID
+
     return cbor2.dumps(cose_key)
 
 
-def _generate_okp_key(key_class: type, crv_id: CoseEllipticCurve, alg: CoseAlgorithm) -> bytes:
+def _generate_okp_key(
+    key_class: type,
+    crv_id: CoseEllipticCurve,
+    alg: CoseAlgorithm,
+    key_id: Optional[bytes] = None
+) -> bytes:
     """Generate an OKP COSE key.
 
     Args:
         key_class: The key class to use (Ed25519PrivateKey or Ed448PrivateKey)
         crv_id: COSE curve identifier
         alg: COSE algorithm identifier
+        key_id: Optional key identifier
 
     Returns:
         CBOR-encoded COSE_Key
@@ -165,6 +185,10 @@ def _generate_okp_key(key_class: type, crv_id: CoseEllipticCurve, alg: CoseAlgor
         -2: x,               # x: public key
         -4: d,               # d: private key
     }
+
+    # Add key ID if provided
+    if key_id is not None:
+        cose_key[2] = key_id  # kid: Key ID
 
     return cbor2.dumps(cose_key)
 
