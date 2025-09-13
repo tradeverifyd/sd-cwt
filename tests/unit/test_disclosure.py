@@ -13,8 +13,8 @@ class TestSelectiveDisclosure:
     @pytest.mark.unit
     def test_create_disclosure_with_salt(self, sample_salts: dict[str, bytes]):
         """Test creating a disclosure with salt."""
-        claim_name = "given_name"
-        claim_value = "John"
+        claim_name = "batch_id"
+        claim_value = "BATCH-2024-001"
         salt = sample_salts[claim_name]
 
         disclosure = [salt, claim_name, claim_value]
@@ -42,7 +42,7 @@ class TestSelectiveDisclosure:
         self, selective_disclosure_claims: dict[str, Any]
     ):
         """Test the structure of selective disclosure claims."""
-        required_fields = ["given_name", "family_name", "email"]
+        required_fields = ["batch_id", "manufacturer", "facility_location", "production_date"]
 
         for field in required_fields:
             assert field in selective_disclosure_claims
@@ -52,11 +52,10 @@ class TestSelectiveDisclosure:
     @pytest.mark.parametrize(
         "claim_name,expected_type",
         [
-            ("given_name", str),
-            ("family_name", str),
-            ("email", str),
-            ("phone_number", str),
-            ("birthdate", str),
+            ("batch_id", str),
+            ("manufacturer", str),
+            ("facility_location", dict),
+            ("production_date", str),
         ],
     )
     def test_claim_types(
@@ -114,22 +113,22 @@ class TestSelectiveDisclosure:
     @pytest.mark.unit
     def test_disclosure_with_complex_value(self, sample_claims: dict[str, Any]):
         """Test disclosure with complex claim value."""
-        address = sample_claims["address"]
-        disclosure = [b"salt_address", "address", address]
+        facility_location = sample_claims["facility_location"]
+        disclosure = [b"salt_facility", "facility_location", facility_location]
 
         assert len(disclosure) == 3
         assert isinstance(disclosure[2], dict)
-        assert "street" in disclosure[2]
-        assert "city" in disclosure[2]
+        assert "country" in disclosure[2]
+        assert "region" in disclosure[2]
 
     @pytest.mark.unit
     def test_disclosure_with_array_value(self, sample_claims: dict[str, Any]):
         """Test disclosure with array claim value."""
-        roles = sample_claims["roles"]
-        disclosure = [b"salt_roles", "roles", roles]
+        certifications = sample_claims["certifications"]
+        disclosure = [b"salt_certs", "certifications", certifications]
 
         assert len(disclosure) == 3
         assert isinstance(disclosure[2], list)
         assert len(disclosure[2]) == 2
-        assert "user" in disclosure[2]
-        assert "admin" in disclosure[2]
+        assert "ISO9001" in disclosure[2]
+        assert "CE" in disclosure[2]

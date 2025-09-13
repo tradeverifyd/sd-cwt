@@ -53,20 +53,19 @@ def sample_claims() -> dict[str, Any]:
         "nbf": int(now.timestamp()),
         "iat": int(now.timestamp()),
         "jti": "unique-token-id-123",
-        "given_name": "John",
-        "family_name": "Doe",
-        "email": "john.doe@example.com",
-        "phone_number": "+1234567890",
-        "address": {
-            "street": "123 Main St",
-            "city": "Anytown",
-            "state": "CA",
-            "postal_code": "12345",
+        "product_name": "Industrial Widget",
+        "batch_id": "BATCH-2024-001",
+        "manufacturer": "widget-factory.example.com",
+        "inspection_status": "passed",
+        "facility_location": {
             "country": "US",
+            "region": "CA",
+            "facility_id": "FAC-001",
+            "zone": "production"
         },
-        "birthdate": "1990-01-01",
-        "is_verified": True,
-        "roles": ["user", "admin"],
+        "production_date": "2024-01-15",
+        "quality_certified": True,
+        "certifications": ["ISO9001", "CE"],
     }
 
 
@@ -85,11 +84,15 @@ def minimal_claims() -> dict[str, Any]:
 def selective_disclosure_claims() -> dict[str, Any]:
     """Claims marked for selective disclosure."""
     return {
-        "given_name": "John",
-        "family_name": "Doe",
-        "email": "john.doe@example.com",
-        "phone_number": "+1234567890",
-        "birthdate": "1990-01-01",
+        "batch_id": "BATCH-2024-001",
+        "manufacturer": "widget-factory.example.com",
+        "facility_location": {
+            "country": "US",
+            "region": "CA",
+            "facility_id": "FAC-001",
+            "zone": "production"
+        },
+        "production_date": "2024-01-15",
     }
 
 
@@ -109,11 +112,10 @@ def cbor_decoder():
 def sample_salts() -> dict[str, bytes]:
     """Provide sample salts for testing selective disclosure."""
     return {
-        "given_name": b"salt1" * 8,  # 40 bytes
-        "family_name": b"salt2" * 8,
-        "email": b"salt3" * 8,
-        "phone_number": b"salt4" * 8,
-        "birthdate": b"salt5" * 8,
+        "batch_id": b"salt1" * 8,  # 40 bytes
+        "manufacturer": b"salt2" * 8,
+        "facility_location": b"salt3" * 8,
+        "production_date": b"salt4" * 8,
     }
 
 
@@ -151,9 +153,9 @@ def mock_cwt_token() -> bytes:
 def disclosure_array() -> list:
     """Provide sample disclosure array for testing."""
     return [
-        ["salt1", "given_name", "John"],
-        ["salt2", "family_name", "Doe"],
-        ["salt3", "email", "john.doe@example.com"],
+        ["salt1", "batch_id", "BATCH-2024-001"],
+        ["salt2", "manufacturer", "widget-factory.example.com"],
+        ["salt3", "production_date", "2024-01-15"],
     ]
 
 

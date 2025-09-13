@@ -36,7 +36,7 @@ class TestEndToEnd:
         assert len(issuer_claims[59]) == len(selective_disclosure_claims)
 
         # Step 2: Holder selects claims to disclose
-        _claims_to_disclose = ["given_name", "email"]
+        _claims_to_disclose = ["batch_id", "manufacturer"]
 
         # Step 3: Create presentation with selected disclosures
         presentation_claims = issuer_claims.copy()
@@ -89,8 +89,8 @@ class TestEndToEnd:
         all_sd_claims = list(selective_disclosure_claims.keys())
 
         # Holder chooses to disclose only subset
-        disclosed_claims = ["given_name", "family_name"]
-        withheld_claims = ["email", "phone_number", "birthdate"]
+        disclosed_claims = ["batch_id", "manufacturer"]
+        withheld_claims = ["facility_location", "production_date"]
 
         # Verify correct claims are disclosed/withheld
         for claim in disclosed_claims:
@@ -108,10 +108,10 @@ class TestEndToEnd:
         all_claims = list(selective_disclosure_claims.keys())
 
         # Presentation 1: Basic info
-        presentation1_claims = ["given_name", "family_name"]
+        presentation1_claims = ["batch_id", "manufacturer"]
 
-        # Presentation 2: Contact info
-        presentation2_claims = ["email", "phone_number"]
+        # Presentation 2: Location info
+        presentation2_claims = ["facility_location", "production_date"]
 
         # Presentation 3: Full disclosure
         presentation3_claims = all_claims

@@ -59,10 +59,10 @@ def demonstrate_cbor_edn():
     
     # 3. Disclosure Array in EDN
     print("\n3. Disclosure Array in EDN:")
-    disclosure_edn = '[h\'73616c74\', "John", "given_name"]'  # SD-CWT format: [salt, value, key]
-    
+    disclosure_edn = '[h\'73616c74\', "BATCH-2024-001", "batch_id"]'  # SD-CWT format: [salt, value, key]
+
     print(f"  EDN: {disclosure_edn}")
-    
+
     disclosure_cbor = edn_utils.diag_to_cbor(disclosure_edn)
     decoded = cbor_utils.decode(disclosure_cbor)
     print(f"  Decoded: [salt={decoded[0]!r}, value={decoded[1]!r}, key={decoded[2]!r}]")
@@ -215,29 +215,29 @@ def demonstrate_test_vectors():
 
 
 def demonstrate_real_world_example():
-    """Demonstrate a real-world SD-CWT scenario."""
+    """Demonstrate a supply chain inspection certificate SD-CWT scenario."""
     print("\n" + "=" * 60)
-    print("Real-World SD-CWT Example")
+    print("Supply Chain Inspection Certificate SD-CWT Example")
     print("=" * 60)
-    
-    # Create issuer's claims
+
+    # Create inspection certificate claims
     all_claims = {
-        "iss": "https://issuer.example.com",
-        "sub": "user123",
+        "iss": "https://inspection.authority.example",
+        "sub": "device://machine-serial-789",
         "iat": 1700000000,
-        "given_name": "Alice",
-        "family_name": "Smith",
-        "email": "alice@example.com",
-        "phone": "+1234567890",
-        "address": {
-            "street": "123 Main St",
-            "city": "Anytown",
+        "inspection_status": "passed",
+        "inspection_date": "2023-11-01",
+        "inspector_license_number": "ABCD-123456",
+        "product_batch_id": "BATCH-2023-1101-789",
+        "facility_location": {
             "country": "US",
+            "region": "CA",
+            "facility_id": "FAC-001"
         },
     }
-    
-    # Select claims for selective disclosure
-    sd_claims = ["given_name", "family_name", "email", "phone", "address"]
+
+    # Select claims for selective disclosure (sensitive business info)
+    sd_claims = ["inspector_license_number", "product_batch_id", "facility_location"]
     
     print("\n1. Original Claims:")
     for k, v in all_claims.items():
@@ -278,12 +278,12 @@ def demonstrate_real_world_example():
     for i, disclosure in enumerate(disclosures):
         print(f"   #{i+1}: [{len(disclosure[0])} bytes salt, '{disclosure[1]}', ...]")
     
-    # Holder selects claims to reveal
-    revealed = ["given_name", "email"]
-    
-    print(f"\n4. Holder Reveals: {revealed}")
-    
-    revealed_disclosures = [d for d in disclosures if d[1] in revealed]
+    # Entity selects claims to reveal to supply chain partner
+    revealed = ["inspector_license_number", "inspection_date"]
+
+    print(f"\n4. Entity Reveals to Supply Chain Partner: {revealed}")
+
+    revealed_disclosures = [d for d in disclosures if d[2] in revealed]  # d[2] is claim_name
     print(f"   Sending {len(revealed_disclosures)} of {len(disclosures)} disclosures")
 
 
