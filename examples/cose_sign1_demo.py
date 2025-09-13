@@ -9,6 +9,9 @@ from sd_cwt import (
     cose_key_get_public,
     cose_sign1_sign,
     cose_sign1_verify,
+)
+# Import internal implementations for demo purposes
+from sd_cwt.cose_sign1 import (
     ES256Signer,
     ES256Verifier,
 )

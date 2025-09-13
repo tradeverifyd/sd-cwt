@@ -4,10 +4,12 @@ import cbor2
 import pytest
 
 from sd_cwt import (
-    ES256Signer,
-    ES256Verifier,
     cose_sign1_sign,
     cose_sign1_verify,
+)
+from sd_cwt.cose_sign1 import (
+    ES256Signer,
+    ES256Verifier,
     generate_es256_key_pair,
 )
 

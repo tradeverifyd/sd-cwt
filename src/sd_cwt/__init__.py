@@ -2,8 +2,6 @@
 
 from .cose_keys import (
     CoseAlgorithm,
-    CoseEllipticCurve,
-    CoseKeyType,
     cose_key_from_dict,
     cose_key_generate,
     cose_key_get_public,
@@ -11,41 +9,33 @@ from .cose_keys import (
     cose_key_to_dict,
 )
 from .cose_sign1 import (
-    ES256Signer,
-    ES256Verifier,
     Signer,
     Verifier,
     cose_sign1_sign,
     cose_sign1_verify,
-    generate_es256_key_pair,
 )
+
+# Hide module imports
+del cose_keys
+del cose_sign1
 
 __version__ = "0.1.0"
 
 
-def main() -> None:
-    """Main entry point for the sd-cwt library."""
-    print("Hello from sd-cwt!")
-
-
 __all__ = [
-    "main",
     "__version__",
-    # COSE Sign1
+    # COSE Sign1 - Core functions
     "cose_sign1_sign",
     "cose_sign1_verify",
+    # Protocols for custom implementations
     "Signer",
     "Verifier",
-    "ES256Signer",
-    "ES256Verifier",
-    "generate_es256_key_pair",
-    # COSE Keys
+    # COSE Keys - Core functions
     "cose_key_generate",
     "cose_key_from_dict",
     "cose_key_to_dict",
     "cose_key_get_public",
     "cose_key_thumbprint",
+    # Algorithm enumeration (needed for key generation)
     "CoseAlgorithm",
-    "CoseKeyType",
-    "CoseEllipticCurve",
 ]

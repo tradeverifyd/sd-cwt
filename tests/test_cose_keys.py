@@ -5,13 +5,15 @@ import pytest
 
 from sd_cwt import (
     CoseAlgorithm,
-    CoseEllipticCurve,
-    CoseKeyType,
     cose_key_from_dict,
     cose_key_generate,
     cose_key_get_public,
     cose_key_thumbprint,
     cose_key_to_dict,
+)
+from sd_cwt.cose_keys import (
+    CoseEllipticCurve,
+    CoseKeyType,
 )
 
 
