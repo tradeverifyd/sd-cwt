@@ -3,7 +3,6 @@
 
 import base64
 import hashlib
-import json
 
 import cbor2
 import cbor_diag

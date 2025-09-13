@@ -1,6 +1,5 @@
 """CBOR and CDDL validation utilities for SD-CWT."""
 
-import json
 from typing import Any, Dict, Optional, Union
 
 import cbor2
