@@ -38,10 +38,12 @@ from .signers import (
 )
 from .resolvers import (
     cose_key_thumbprint_resolver,
+    cose_key_kid_resolver,
 )
 
 # Hide module imports
 from . import cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
+
 del cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
 
 __version__ = "0.1.0"
@@ -83,4 +85,5 @@ __all__ = [
     "create_presentation_signer",
     # Resolvers for dynamic key resolution
     "cose_key_thumbprint_resolver",
+    "cose_key_kid_resolver",
 ]
