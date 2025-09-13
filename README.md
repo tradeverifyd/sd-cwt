@@ -11,6 +11,7 @@ SD-CWT (Selective Disclosure CBOR Web Token) is a specification that enables sel
 - **IETF Working Group Repository**: [https://github.com/ietf-wg-spice/draft-ietf-spice-sd-cwt](https://github.com/ietf-wg-spice/draft-ietf-spice-sd-cwt)
 - **IETF Datatracker**: [https://datatracker.ietf.org/doc/draft-ietf-spice-sd-cwt/](https://datatracker.ietf.org/doc/draft-ietf-spice-sd-cwt/)
 - **Implemented Internet-Draft**: [draft-ietf-spice-sd-cwt-04](https://datatracker.ietf.org/doc/html/draft-ietf-spice-sd-cwt-04)
+- **RFC 9679**: [COSE Key Thumbprint](https://www.rfc-editor.org/rfc/rfc9679.html)
 
 ## Installation
 
@@ -147,12 +148,14 @@ sd-cwt/
 └── README.md            # This file
 ```
 
-## Features (Planned)
+## Features
 
 - **SD-CWT Creation**: Generate selective disclosure CWTs with hidden claims
 - **Claim Verification**: Verify the integrity and authenticity of SD-CWTs
 - **Selective Disclosure**: Choose which claims to reveal during presentation
 - **CBOR/COSE Support**: Full support for CBOR encoding and COSE signatures
+- **COSE Key Thumbprints**: RFC 9679 compliant key thumbprint computation
+- **CBOR Validation**: CBOR diagnostic notation and CDDL schema validation
 - **Salted Hashing**: Privacy-preserving claim commitments using salted hashes
 - **Holder Binding**: Optional holder binding for enhanced security
 
