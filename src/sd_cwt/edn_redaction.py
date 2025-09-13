@@ -9,7 +9,7 @@ import re
 from typing import Any, Union
 
 import cbor2
-import cbor_diag
+import cbor_diag  # type: ignore[import-untyped]
 
 
 class EDNRedactionParser:
@@ -19,11 +19,13 @@ class EDNRedactionParser:
     REDACTED_CLAIM_KEY_TAG = 59  # TBD4 - requested value 59
     REDACTED_CLAIM_ELEMENT_TAG = 60  # Tag 60
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize EDN redaction parser."""
-        self.redacted_claims = []
+        self.redacted_claims: list[Union[str, int]] = []
 
-    def parse_edn_with_redaction(self, edn_text: str) -> tuple[dict[Any, Any], list[str]]:
+    def parse_edn_with_redaction(
+        self, edn_text: str
+    ) -> tuple[dict[Any, Any], list[Union[str, int]]]:
         """Parse EDN text and extract redaction information.
 
         Args:
@@ -61,7 +63,7 @@ class EDNRedactionParser:
 
         return claims, self.redacted_claims
 
-    def _extract_claim_name_from_context(self, edn_text: str, tag_pos: int):
+    def _extract_claim_name_from_context(self, edn_text: str, tag_pos: int) -> None:
         """Extract claim name from the context around a redaction tag."""
         # Find the line containing the tag
         lines = edn_text[:tag_pos].split("\n")
@@ -97,7 +99,7 @@ class EDNRedactionParser:
 class EDNRedactionBuilder:
     """Builder for creating EDN with redaction tags."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize EDN redaction builder."""
         pass
 

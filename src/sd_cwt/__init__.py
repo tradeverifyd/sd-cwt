@@ -3,7 +3,7 @@
 __version__ = "0.1.0"
 
 
-def main():
+def main() -> None:
     """Main entry point for the sd-cwt library."""
     print("Hello from sd-cwt!")
 

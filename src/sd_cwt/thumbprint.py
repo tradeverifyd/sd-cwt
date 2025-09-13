@@ -122,11 +122,13 @@ class CoseKeyThumbprint:
             key = serialization.load_pem_public_key(pem_data, backend=default_backend())
         except Exception:
             # Try loading as private key
-            key = serialization.load_pem_private_key(
+            private_key = serialization.load_pem_private_key(
                 pem_data, password=None, backend=default_backend()
             )
-            if hasattr(key, "public_key"):
-                key = key.public_key()
+            if hasattr(private_key, "public_key"):
+                key = private_key.public_key()
+            else:
+                raise ValueError("Could not extract public key from private key") from None
 
         # Convert to COSE format based on key type
         if isinstance(key, ec.EllipticCurvePublicKey):
@@ -157,10 +159,14 @@ class CoseKeyThumbprint:
 
         elif isinstance(key, rsa.RSAPublicKey):
             # RSA key
-            public_numbers = key.public_numbers()
+            rsa_public_numbers = key.public_numbers()
 
-            n_bytes = public_numbers.n.to_bytes((public_numbers.n.bit_length() + 7) // 8, "big")
-            e_bytes = public_numbers.e.to_bytes((public_numbers.e.bit_length() + 7) // 8, "big")
+            n_bytes = rsa_public_numbers.n.to_bytes(
+                (rsa_public_numbers.n.bit_length() + 7) // 8, "big"
+            )
+            e_bytes = rsa_public_numbers.e.to_bytes(
+                (rsa_public_numbers.e.bit_length() + 7) // 8, "big"
+            )
 
             return {
                 1: 3,  # kty: RSA

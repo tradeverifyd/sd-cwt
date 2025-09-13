@@ -1,6 +1,5 @@
 """Unit tests for EDN-based claim redaction syntax."""
 
-
 import pytest
 
 from sd_cwt.edn_redaction import (

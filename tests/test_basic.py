@@ -1,6 +1,5 @@
 """Basic tests for sd-cwt package."""
 
-
 from sd_cwt import __version__, main
 
 

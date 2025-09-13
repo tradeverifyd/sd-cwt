@@ -3,8 +3,8 @@
 from typing import Any, Optional
 
 import cbor2
-import cbor_diag
-import pycddl
+import cbor_diag  # type: ignore[import-untyped]
+import pycddl  # type: ignore[import-untyped]
 
 
 class CBORValidator:
@@ -20,7 +20,7 @@ class CBORValidator:
         Returns:
             Diagnostic notation string
         """
-        return cbor_diag.cbor2diag(cbor_data)
+        return cbor_diag.cbor2diag(cbor_data)  # type: ignore[no-any-return]
 
     @staticmethod
     def from_diagnostic(diag_str: str) -> bytes:
@@ -32,7 +32,7 @@ class CBORValidator:
         Returns:
             CBOR encoded bytes
         """
-        return cbor_diag.diag2cbor(diag_str)
+        return cbor_diag.diag2cbor(diag_str)  # type: ignore[no-any-return]
 
     @staticmethod
     def validate_structure(cbor_data: bytes) -> bool:
@@ -152,7 +152,7 @@ class CDDLValidator:
 class SDCWTValidator:
     """High-level validator for SD-CWT tokens."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize SD-CWT validator."""
         self.cbor_validator = CBORValidator()
         self.cddl_validator = CDDLValidator()
@@ -166,7 +166,7 @@ class SDCWTValidator:
         Returns:
             Validation results dictionary
         """
-        results = {
+        results: dict[str, Any] = {
             "valid": False,
             "cbor_valid": False,
             "cddl_valid": False,
@@ -237,7 +237,12 @@ class SDCWTValidator:
         Returns:
             Validation results dictionary
         """
-        results = {"valid": False, "cbor_valid": False, "format_valid": False, "errors": []}
+        results: dict[str, Any] = {
+            "valid": False,
+            "cbor_valid": False,
+            "format_valid": False,
+            "errors": [],
+        }
 
         # Check CBOR structure
         if not self.cbor_validator.validate_structure(disclosure):

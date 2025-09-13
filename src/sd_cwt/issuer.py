@@ -11,7 +11,7 @@ import secrets
 from typing import Any, Optional
 
 import cbor2
-import cbor_diag
+import cbor_diag  # type: ignore[import-untyped]
 from fido2.cose import CoseKey
 
 
@@ -49,13 +49,18 @@ class SDCWTIssuer:
         redacted_claims = []
 
         # Look for redaction tags in the parsed structure
-        def find_redacted_claims(obj, path=""):
+        def find_redacted_claims(obj: Any, path: str = "") -> None:
             if isinstance(obj, dict):
                 for key, value in obj.items():
                     current_path = f"{path}.{key}" if path else str(key)
 
                     # Check if this is a redacted claim key (tag 59)
-                    if hasattr(value, "tag") and value.tag == self.REDACTED_CLAIM_KEY_TAG or hasattr(value, "tag") and value.tag == self.REDACTED_CLAIM_ELEMENT_TAG:
+                    if (
+                        hasattr(value, "tag")
+                        and value.tag == self.REDACTED_CLAIM_KEY_TAG
+                        or hasattr(value, "tag")
+                        and value.tag == self.REDACTED_CLAIM_ELEMENT_TAG
+                    ):
                         redacted_claims.append(key)
 
                     # Recursively check nested structures
@@ -163,7 +168,7 @@ class SDCWTIssuer:
         protected_header_cbor = cbor2.dumps(protected_header)
 
         # Unprotected header (empty)
-        unprotected_header = {}
+        unprotected_header: dict[str, Any] = {}
 
         # Payload (SD-CWT claims)
         payload = cbor2.dumps(sd_cwt_claims)
@@ -217,7 +222,7 @@ class SDCWTIssuer:
             EDN representation
         """
         cbor_data = cbor2.dumps(data)
-        return cbor_diag.cbor2diag(cbor_data)
+        return cbor_diag.cbor2diag(cbor_data)  # type: ignore[no-any-return]
 
 
 def create_example_edn_claims() -> str:
