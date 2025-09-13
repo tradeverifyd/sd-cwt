@@ -40,6 +40,13 @@ from .resolvers import (
     cose_key_thumbprint_resolver,
     cose_key_kid_resolver,
 )
+from .simple_api import (
+    create_edn_with_annotations,
+    create_presentation_edn,
+    SDCWTIssuer,
+    SDCWTPresenter,
+    SDCWTVerifier,
+)
 
 # Hide module imports
 from . import cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
@@ -86,4 +93,10 @@ __all__ = [
     # Resolvers for dynamic key resolution
     "cose_key_thumbprint_resolver",
     "cose_key_kid_resolver",
+    # Simple APIs for SD-CWT workflow
+    "create_edn_with_annotations",
+    "create_presentation_edn",
+    "SDCWTIssuer",
+    "SDCWTPresenter",
+    "SDCWTVerifier",
 ]

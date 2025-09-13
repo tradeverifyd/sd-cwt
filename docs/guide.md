@@ -39,23 +39,23 @@ sd-cwt-cli issue_sd_cwt \
   / vct: credential type /               11: "https://steel.consortium.example/rebar/v1.cddl",
   / mandatory to disclose /              "production_date": "2024-01-15",
   / mandatory to disclose /              "steel_grade": "ASTM A615 Grade 60",
-  / optional to disclose /               "heat_number": 59("H240115-001"),
-  / optional to disclose /               "chemical_composition": 59({
+  / optional to disclose /               "heat_number": 58("H240115-001"),
+  / optional to disclose /               "chemical_composition": 58({
     / carbon percentage /                  "carbon": 0.25,
     / manganese percentage /               "manganese": 1.20,
     / phosphorus percentage /              "phosphorus": 0.040,
     / sulfur percentage /                  "sulfur": 0.050
   }),
-  / optional to disclose /               "production_cost": 59(850.75),
-  / optional to disclose /               "quality_test_results": 59({
+  / optional to disclose /               "production_cost": 58(850.75),
+  / optional to disclose /               "quality_test_results": 58({
     / MPa /                                "tensile_strength": 420,
     / MPa /                                "yield_strength": 350,
     / percentage /                         "elongation": 18.5
   }),
-  / optional to disclose /               "inspection_dates": 59([
+  / optional to disclose /               "inspection_dates": 58([
     / initial inspection /                  1549560720,
-    / quality check /                       60(1612498440),
-    / final inspection /                    60(1674004740)
+    / quality check /                       58(1612498440),
+    / final inspection /                    58(1674004740)
   ])
 }'
 ```

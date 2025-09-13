@@ -70,6 +70,9 @@ class CredentialVerifier:
             is_valid, payload_bytes = cose_sign1_verify(sd_cwt, verifier)
             if is_valid and payload_bytes:
                 payload = cbor_utils.decode(payload_bytes)
+                # Handle case where payload is double-encoded CBOR
+                if isinstance(payload, bytes):
+                    payload = cbor_utils.decode(payload)
                 return True, payload
             return False, None
 
