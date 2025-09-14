@@ -11,6 +11,7 @@ from sd_cwt import (
     cose_key_kid_resolver,
     create_edn_with_annotations,
     create_presentation_edn,
+    select_disclosures_by_claim_names,
 )
 from sd_cwt.thumbprint import CoseKeyThumbprint
 
@@ -84,9 +85,8 @@ class TestSimpleAPIWorkflow:
         # Select subset of optional claims to disclose
         selected_claims = ["heat_number", "chemical_composition"]
 
-        # For simplicity in this test, we'll select some disclosures
-        # In a real implementation, the presenter would match disclosures to claim names
-        selected_disclosures = disclosures[:2] if len(disclosures) >= 2 else disclosures
+        # Select disclosures that match the specified claim names
+        selected_disclosures = select_disclosures_by_claim_names(disclosures, selected_claims)
 
         kbt = presenter.create_presentation(
             sd_cwt=sd_cwt,
@@ -138,6 +138,19 @@ class TestSimpleAPIWorkflow:
             assert verified_claims[claim_name] == base_claims[claim_name], f"Base claim {claim_name} should match"
 
         print("✓ Base claims (mandatory to disclose) present and correct")
+
+        # Step 9: Check that selected optional claims are present
+        for claim_name in selected_claims:
+            assert claim_name in verified_claims, f"Selected claim {claim_name} should be disclosed"
+
+        print("✓ Selected optional claims are disclosed")
+
+        # Step 10: Check that non-selected optional claims are NOT present
+        non_selected_claims = [claim for claim in optional_claims.keys() if claim not in selected_claims]
+        for claim_name in non_selected_claims:
+            assert claim_name not in verified_claims, f"Non-selected claim {claim_name} should not be disclosed"
+
+        print("✓ Non-selected optional claims are properly redacted")
 
         print("✓ Complete workflow test passed!")
 

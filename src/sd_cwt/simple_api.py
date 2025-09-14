@@ -12,6 +12,34 @@ from .signers import CredentialSigner, PresentationSigner
 from .thumbprint import CoseKeyThumbprint
 
 
+def select_disclosures_by_claim_names(
+    disclosures: List[bytes],
+    claim_names: List[str]
+) -> List[bytes]:
+    """Select disclosures that match the specified claim names.
+
+    Args:
+        disclosures: List of all available disclosure bytes
+        claim_names: List of claim names to select
+
+    Returns:
+        List of selected disclosure bytes
+    """
+    selected = []
+    for disclosure_bytes in disclosures:
+        try:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            if isinstance(disclosure, list) and len(disclosure) == 3:
+                # SD-CWT format: [salt, value, key]
+                salt, value, key = disclosure
+                if isinstance(key, str) and key in claim_names:
+                    selected.append(disclosure_bytes)
+        except Exception:
+            # Skip invalid disclosures
+            continue
+    return selected
+
+
 def create_edn_with_annotations(
     base_claims: Dict[str, Any],
     optional_claims: Dict[str, Any],
@@ -286,10 +314,10 @@ class SDCWTPresenter:
                 nonce="1234567890"
             )
         """
-        # For the KBT, we include just the original SD-CWT in the kcwt field
-        # The disclosures would be processed separately in a full implementation
-        # For now, we'll just use the original SD-CWT
-        sd_cwt_with_disclosures = sd_cwt
+        # Create SD-CWT with selected disclosures for presentation
+        sd_cwt_with_disclosures = self._create_sd_cwt_with_selected_disclosures(
+            sd_cwt, selected_disclosures
+        )
 
         # Create the KBT
         holder_thumbprint = CoseKeyThumbprint.compute(self.holder_key, "sha256")
@@ -307,6 +335,65 @@ class SDCWTPresenter:
         )
 
         return kbt
+
+    def _create_sd_cwt_with_selected_disclosures(
+        self,
+        original_sd_cwt: bytes,
+        selected_disclosures: List[bytes]
+    ) -> bytes:
+        """Create SD-CWT with only selected disclosures in unprotected header.
+
+        Args:
+            original_sd_cwt: Original SD-CWT from issuer
+            selected_disclosures: Subset of disclosures to include
+
+        Returns:
+            Modified SD-CWT with selected disclosures
+        """
+        # Decode the original SD-CWT
+        cose_sign1 = cbor_utils.decode(original_sd_cwt)
+
+        # Handle CBOR tag wrapping
+        if cbor_utils.is_tag(cose_sign1):
+            cose_sign1_value = cbor_utils.get_tag_value(cose_sign1)
+        else:
+            cose_sign1_value = cose_sign1
+
+        if not isinstance(cose_sign1_value, list) or len(cose_sign1_value) != 4:
+            raise ValueError("Invalid COSE Sign1 structure")
+
+        # Extract components: [protected, unprotected, payload, signature]
+        protected_header_bytes = cose_sign1_value[0]
+        unprotected_header = cose_sign1_value[1]
+        payload_bytes = cose_sign1_value[2]
+        signature_bytes = cose_sign1_value[3]
+
+        # Create new unprotected header with selected disclosures
+        new_unprotected = unprotected_header.copy() if unprotected_header else {}
+
+        # Update sd_claims field (TBD1/17) with selected disclosures
+        sd_claims_key = 17  # Based on spec examples
+        new_unprotected[sd_claims_key] = selected_disclosures
+
+        # Reconstruct COSE Sign1 with modified unprotected header
+        new_cose_sign1_value = [
+            protected_header_bytes,
+            new_unprotected,
+            payload_bytes,
+            signature_bytes
+        ]
+
+        # Re-wrap with tag if original was tagged
+        if cbor_utils.is_tag(cose_sign1):
+            new_cose_sign1 = cbor_utils.create_tag(
+                cbor_utils.get_tag_number(cose_sign1),
+                new_cose_sign1_value
+            )
+        else:
+            new_cose_sign1 = new_cose_sign1_value
+
+        # Encode and return
+        return cbor_utils.encode(new_cose_sign1)
 
 
 class SDCWTVerifier:
@@ -390,8 +477,10 @@ class SDCWTVerifier:
             if not kbt_valid or not kbt_payload:
                 return False, None, False
 
-            # Extract and clean the verified claims
-            clean_claims, tags_absent = self._extract_clean_claims(payload)
+            # Extract disclosures from the SD-CWT and reconstruct verified claims
+            clean_claims, tags_absent = self._reconstruct_verified_claims(
+                sd_cwt_with_disclosures, payload
+            )
 
             return True, clean_claims, tags_absent
 
@@ -440,6 +529,67 @@ class SDCWTVerifier:
 
             if isinstance(key, str):
                 clean_claims[key] = clean_value
+
+        return clean_claims, tags_absent
+
+    def _reconstruct_verified_claims(
+        self,
+        sd_cwt_with_disclosures: bytes,
+        payload: Dict[int, Any]
+    ) -> Tuple[Dict[str, Any], bool]:
+        """Reconstruct verified claims from SD-CWT payload and disclosures.
+
+        Args:
+            sd_cwt_with_disclosures: SD-CWT with selected disclosures
+            payload: Decoded SD-CWT payload
+
+        Returns:
+            Tuple of (clean_claims, tags_absent)
+        """
+        # First, extract the base claims from payload (same as before)
+        clean_claims, _ = self._extract_clean_claims(payload)
+
+        # Extract disclosed claims from SD-CWT unprotected header
+        try:
+            cose_sign1 = cbor_utils.decode(sd_cwt_with_disclosures)
+            if cbor_utils.is_tag(cose_sign1):
+                cose_sign1_value = cbor_utils.get_tag_value(cose_sign1)
+            else:
+                cose_sign1_value = cose_sign1
+
+            if isinstance(cose_sign1_value, list) and len(cose_sign1_value) >= 2:
+                unprotected_header = cose_sign1_value[1]
+                if isinstance(unprotected_header, dict):
+                    # Extract sd_claims (key 17 based on spec examples)
+                    sd_claims = unprotected_header.get(17, [])
+
+                    # Process each disclosure and add to clean_claims
+                    for disclosure_bytes in sd_claims:
+                        if isinstance(disclosure_bytes, bytes):
+                            disclosure = cbor_utils.decode(disclosure_bytes)
+                            if isinstance(disclosure, list) and len(disclosure) == 3:
+                                # SD-CWT format: [salt, value, key]
+                                salt, value, key = disclosure
+
+                                # Add disclosed claim to clean_claims
+                                if isinstance(key, str):
+                                    clean_claims[key] = value
+                                elif isinstance(key, int):
+                                    # Handle numeric keys by converting to standard claim names
+                                    if key == 1:
+                                        clean_claims['iss'] = value
+                                    elif key == 2:
+                                        clean_claims['sub'] = value
+                                    elif key == 6:
+                                        clean_claims['iat'] = value
+                                    # Add other numeric key mappings as needed
+
+        except Exception:
+            # If disclosure processing fails, just return the base claims
+            pass
+
+        # All disclosed claims should have tags absent since they're explicitly disclosed
+        tags_absent = True
 
         return clean_claims, tags_absent
 

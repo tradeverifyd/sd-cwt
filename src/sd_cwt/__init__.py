@@ -43,6 +43,7 @@ from .resolvers import (
 from .simple_api import (
     create_edn_with_annotations,
     create_presentation_edn,
+    select_disclosures_by_claim_names,
     SDCWTIssuer,
     SDCWTPresenter,
     SDCWTVerifier,
@@ -96,6 +97,7 @@ __all__ = [
     # Simple APIs for SD-CWT workflow
     "create_edn_with_annotations",
     "create_presentation_edn",
+    "select_disclosures_by_claim_names",
     "SDCWTIssuer",
     "SDCWTPresenter",
     "SDCWTVerifier",
