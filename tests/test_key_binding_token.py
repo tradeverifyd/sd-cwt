@@ -12,9 +12,9 @@ from sd_cwt import (
     cose_key_kid_resolver,
     get_presentation_verifier,
 )
-from sd_cwt.thumbprint import CoseKeyThumbprint
 from sd_cwt.cose_sign1 import cose_sign1_sign
 from sd_cwt.holder_binding import create_cnf_claim, create_sd_kbt, validate_sd_kbt_structure
+from sd_cwt.thumbprint import CoseKeyThumbprint
 
 
 class TestKeyBindingToken:

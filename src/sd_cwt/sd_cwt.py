@@ -1,4 +1,5 @@
 from . import cbor_utils
+
 """Complete SD-CWT implementation with mandatory holder binding.
 
 This module provides high-level functions for creating SD-CWTs with mandatory
@@ -7,22 +8,16 @@ confirmation claims and SD-KBTs according to the IETF SPICE specification.
 
 from typing import Any, Optional
 
-
-from .cose_keys import cose_key_generate, cose_key_to_dict, cose_key_thumbprint
+from .cose_keys import cose_key_generate
 from .cose_sign1 import Signer, cose_sign1_sign
 from .holder_binding import (
-    create_cnf_claim,
     create_sd_cwt_with_mandatory_cnf,
     create_sd_kbt,
-    validate_sd_cwt_cnf
+    validate_sd_cwt_cnf,
 )
 from .redaction import (
     SaltGenerator,
     edn_to_redacted_cbor,
-    find_redacted_claims,
-    parse_edn_to_cbor,
-    cbor_to_dict,
-    process_redactions
 )
 
 

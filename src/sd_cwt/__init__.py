@@ -1,5 +1,7 @@
 """SD-CWT: SPICE SD-CWT specification implementation."""
 
+# Hide module imports
+from . import cose_keys, cose_sign1, redaction, resolvers, sd_cwt, signers, verifiers
 from .cose_keys import (
     cose_key_from_dict,
     cose_key_generate,
@@ -14,21 +16,20 @@ from .cose_sign1 import (
     cose_sign1_verify,
 )
 from .redaction import (
+    SaltGenerator,
     SecureSaltGenerator,
     SeededSaltGenerator,
-    SaltGenerator,
     edn_to_redacted_cbor,
 )
-from .sd_cwt import (
-    create_sd_cwt_with_holder_binding,
-    create_sd_cwt_presentation,
-    validate_sd_cwt_presentation,
-    extract_verified_claims,
+from .resolvers import (
+    cose_key_kid_resolver,
+    cose_key_thumbprint_resolver,
 )
-from .verifiers import (
-    CredentialVerifier,
-    PresentationVerifier,
-    get_presentation_verifier,
+from .sd_cwt import (
+    create_sd_cwt_presentation,
+    create_sd_cwt_with_holder_binding,
+    extract_verified_claims,
+    validate_sd_cwt_presentation,
 )
 from .signers import (
     CredentialSigner,
@@ -36,21 +37,19 @@ from .signers import (
     create_credential_signer,
     create_presentation_signer,
 )
-from .resolvers import (
-    cose_key_thumbprint_resolver,
-    cose_key_kid_resolver,
-)
 from .simple_api import (
-    create_edn_with_annotations,
-    create_presentation_edn,
-    select_disclosures_by_claim_names,
     SDCWTIssuer,
     SDCWTPresenter,
     SDCWTVerifier,
+    create_edn_with_annotations,
+    create_presentation_edn,
+    select_disclosures_by_claim_names,
 )
-
-# Hide module imports
-from . import cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
+from .verifiers import (
+    CredentialVerifier,
+    PresentationVerifier,
+    get_presentation_verifier,
+)
 
 del cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
 

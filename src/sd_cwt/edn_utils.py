@@ -4,7 +4,6 @@ This module provides a unified interface for CBOR EDN operations,
 abstracting the underlying cbor-diag library implementation.
 """
 
-from typing import Any
 
 import cbor_diag  # type: ignore[import-untyped]
 

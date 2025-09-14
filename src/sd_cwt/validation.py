@@ -1,10 +1,10 @@
 from . import cbor_utils
+
 """CBOR and CDDL validation utilities for SD-CWT."""
 
 from typing import Any, Optional
 
 from . import cddl_utils, edn_utils
-from .cddl_schemas import COMBINED_CDDL
 
 
 class CBORValidator:

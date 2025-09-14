@@ -8,8 +8,8 @@ Currently uses cbor2 as the underlying implementation.
 """
 
 from typing import Any, Union
-import cbor2
 
+import cbor2
 
 # Type aliases for CBOR special values
 CBORTag = cbor2.CBORTag

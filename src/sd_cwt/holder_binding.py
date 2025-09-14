@@ -1,13 +1,12 @@
 from . import cbor_utils
+
 """SD-CWT Holder Binding implementation.
 
 This module implements mandatory holder binding for SD-CWT according to the
 latest IETF SPICE specification, including SD-KBT (Key Binding Token) generation.
 """
 
-import hashlib
 from typing import Any, Optional
-
 
 from .cose_keys import cose_key_thumbprint, cose_key_to_dict
 from .cose_sign1 import Signer, cose_sign1_sign

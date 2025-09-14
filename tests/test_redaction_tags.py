@@ -1,6 +1,5 @@
 """Test redaction process using tags 58, 59, and 60."""
 
-import pytest
 
 from sd_cwt import cbor_utils
 from sd_cwt.redaction import SeededSaltGenerator, edn_to_redacted_cbor
@@ -89,8 +88,8 @@ class TestRedactionTags:
         assert map_key_disclosure[2] == "private_key", "Map key disclosure should have key name"
         assert array_element_disclosure[2] == 1, "Array element disclosure should have array index"
 
-        print(f"✓ Tag 58 map key 'private_key' → removed from claims, hash in simple(59)")
-        print(f"✓ Tag 58 array element 'secret_item' → replaced with tag 60 wrapped hash")
+        print("✓ Tag 58 map key 'private_key' → removed from claims, hash in simple(59)")
+        print("✓ Tag 58 array element 'secret_item' → replaced with tag 60 wrapped hash")
         print(f"✓ Created {len(disclosures)} disclosures for redacted items")
 
     def test_tag_meaning_explanation(self):
@@ -119,7 +118,7 @@ class TestRedactionTags:
         # After redaction - map keys go to simple(59)
         simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
-        print(f"Simple value 59: Used in final CBOR for redacted map key hashes")
+        print("Simple value 59: Used in final CBOR for redacted map key hashes")
         print(f"  - Found {len(claims[simple_59])} hash(es) for redacted map keys")
 
         # After redaction - array elements are replaced with tag 60 wrapped hashes
@@ -236,12 +235,12 @@ class TestRedactionTags:
         # Simple 59 usage verified
         simple_59 = cbor_utils.create_simple_value(59)
         assert simple_59 in claims
-        print(f"\nSimple 59 usage (output):")
+        print("\nSimple 59 usage (output):")
         print(f"  - Contains hashes of redacted map keys: {len(claims[simple_59])} hash(es)")
         print("  - Used in final CBOR claims structure")
 
         # Tag 60 conceptual usage
-        print(f"\nTag 60 usage (conceptual):")
+        print("\nTag 60 usage (conceptual):")
         print("  - Used for in-place hash replacement of redacted array elements")
         print("  - In our implementation, array elements are replaced with tag 60 wrapped hashes")
         print("  - Preserves array structure and allows reconstruction")

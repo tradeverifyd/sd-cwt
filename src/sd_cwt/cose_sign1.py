@@ -6,10 +6,11 @@ that accept signer and verifier functions, allowing keys to be managed externall
 
 from typing import Any, Optional, Protocol
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
-from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import InvalidSignature
+
 from . import cbor_utils
 
 

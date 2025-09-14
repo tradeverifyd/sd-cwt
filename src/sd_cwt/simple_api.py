@@ -2,7 +2,7 @@
 
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import cbor_utils
 from .cose_sign1 import cose_sign1_sign
@@ -99,7 +99,7 @@ def create_edn_with_annotations(
         f'  2: "{subject}",',
         f"  6: {current_time},",
         f"  8: {cnf_edn},",
-        f'  11: "https://steel.consortium.example/rebar/v1.cddl",',
+        '  11: "https://steel.consortium.example/rebar/v1.cddl",',
     ]
 
     # Add base claims (mandatory to disclose) - these are not wrapped in tags

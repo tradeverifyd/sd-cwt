@@ -6,7 +6,6 @@ from typing import Any, Optional, Protocol
 
 from . import cbor_utils, edn_utils
 
-
 # CBOR tags for redaction (from SD-CWT spec and guide.md)
 REDACTED_CLAIM_KEY_TAG = 58  # Tag for to-be-redacted claim keys in EDN
 REDACTED_CLAIM_ELEMENT_TAG = 58  # Tag for to-be-redacted array elements in EDN

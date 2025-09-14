@@ -1,11 +1,11 @@
 from . import cbor_utils
+
 """COSE Key generation and management."""
 
 from typing import Any, Optional
 
-from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
-
+from cryptography.hazmat.primitives.asymmetric import ec
 
 # Constants for ES256/P-256 only
 COSE_ALG_ES256 = -7

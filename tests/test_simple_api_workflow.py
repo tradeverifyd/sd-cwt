@@ -1,6 +1,5 @@
 """Test the simple API workflow from annotation to presentation verification."""
 
-import pytest
 
 from sd_cwt import (
     SDCWTIssuer,
@@ -133,7 +132,7 @@ class TestSimpleAPIWorkflow:
         print("✓ Mandatory claims present and correct")
 
         # Step 8: Check that base claims (mandatory to disclose) are present
-        for claim_name in base_claims.keys():
+        for claim_name in base_claims:
             assert claim_name in verified_claims, f"Base claim {claim_name} should be present"
             assert verified_claims[claim_name] == base_claims[claim_name], f"Base claim {claim_name} should match"
 
@@ -146,7 +145,7 @@ class TestSimpleAPIWorkflow:
         print("✓ Selected optional claims are disclosed")
 
         # Step 10: Check that non-selected optional claims are NOT present
-        non_selected_claims = [claim for claim in optional_claims.keys() if claim not in selected_claims]
+        non_selected_claims = [claim for claim in optional_claims if claim not in selected_claims]
         for claim_name in non_selected_claims:
             assert claim_name not in verified_claims, f"Non-selected claim {claim_name} should not be disclosed"
 
@@ -212,7 +211,6 @@ class TestSimpleAPIWorkflow:
         """Test that verifier correctly detects absence of redaction tags."""
         # This is a simplified test to verify the tag detection logic
         from sd_cwt.simple_api import SDCWTVerifier
-        import sd_cwt.cbor_utils as cbor_utils
 
         # Create a mock verifier to test tag detection
         mock_resolver = lambda kid: {"mock": "key"}

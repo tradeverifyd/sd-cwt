@@ -1,4 +1,5 @@
 from . import cbor_utils
+
 """EDN-based claim redaction syntax for SD-CWT.
 
 This module provides utilities for marking claims for redaction using

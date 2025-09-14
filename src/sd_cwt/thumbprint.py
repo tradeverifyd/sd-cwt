@@ -1,9 +1,9 @@
 from . import cbor_utils
+
 """COSE Key Thumbprint computation according to RFC 9679."""
 
 import hashlib
 from typing import Any
-
 
 
 class CoseKeyThumbprint:
