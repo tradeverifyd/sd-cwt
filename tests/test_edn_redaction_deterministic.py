@@ -434,3 +434,433 @@ class TestEDNRedactionDeterministic:
         disclosure = cbor_utils.decode(disclosures[0])
         assert disclosure[1] == "redacted_value"
         assert disclosure[2] == "custom_claim"
+
+    def test_edn_serialization_examples_for_developers(self):
+        """Show complete EDN examples of redacted payloads for developer understanding."""
+        # Original EDN with tag 58 annotations
+        original_edn = """{
+            "iss": "https://issuer.example",
+            "sub": "https://subject.example",
+            "iat": 1725244200,
+            "mandatory_claim": "always_visible",
+            "secret_data": 58("confidential_value"),
+            "optional_info": 58({"nested": "object", "value": 42}),
+            "inspection_dates": [
+                1549560720,
+                58(1612498440),
+                1690000000
+            ]
+        }"""
+
+        # Generate redacted CBOR with deterministic salt
+        salt_gen = SeededSaltGenerator(seed=1337)
+        cbor_bytes, disclosures = edn_to_redacted_cbor(original_edn, salt_gen)
+
+        # Get the CBOR hex for export
+        cbor_hex = cbor_bytes.hex()
+        print(f"\n=== REDACTED CBOR (hex) ===")
+        print(f"{cbor_hex}")
+
+        # Decode to show the redacted structure
+        redacted_payload = cbor_utils.decode(cbor_bytes)
+
+        # Show what the redacted EDN looks like conceptually
+        print(f"\n=== ORIGINAL EDN (with tag 58 annotations) ===")
+        print(original_edn.strip())
+
+        print(f"\n=== REDACTED EDN STRUCTURE (after processing) ===")
+        # Build the redacted EDN representation for display
+        simple_59 = cbor_utils.create_simple_value(59)
+
+        # Format the inspection dates array showing tag 60
+        inspection_dates = redacted_payload["inspection_dates"]
+        formatted_dates = []
+        for i, date in enumerate(inspection_dates):
+            if cbor_utils.is_tag(date) and cbor_utils.get_tag_number(date) == 60:
+                hash_value = cbor_utils.get_tag_value(date)
+                formatted_dates.append(f'60(h\'{hash_value.hex()[:16]}...\')')  # Show first 16 hex chars
+            else:
+                formatted_dates.append(str(date))
+
+        # Format the simple(59) hash array
+        hash_array = redacted_payload[simple_59]
+        formatted_hashes = []
+        for hash_bytes in hash_array:
+            formatted_hashes.append(f'h\'{hash_bytes.hex()[:16]}...\'')  # Show first 16 hex chars
+
+        redacted_edn_display = f"""{{
+    "iss": "https://issuer.example",
+    "sub": "https://subject.example",
+    "iat": 1725244200,
+    "mandatory_claim": "always_visible",
+    "inspection_dates": [{', '.join(formatted_dates)}],
+    simple(59): [{', '.join(formatted_hashes)}]
+}}"""
+
+        print(redacted_edn_display)
+
+        print(f"\n=== DISCLOSURES (salt, value, key format) ===")
+        for i, disclosure_bytes in enumerate(disclosures):
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            salt_hex = disclosure[0].hex()[:16]  # First 16 hex chars
+            value = disclosure[1]
+            key = disclosure[2]
+            if isinstance(value, dict):
+                value_str = str(value)
+            elif isinstance(value, str):
+                value_str = f'"{value}"'
+            else:
+                value_str = str(value)
+            print(f"Disclosure {i+1}: [h'{salt_hex}...', {value_str}, \"{key}\"]")
+
+        # Validation assertions for developers to understand behavior
+        print(f"\n=== VALIDATION CHECKS ===")
+
+        # Check that tag 58 map keys became simple(59) entries
+        assert simple_59 in redacted_payload, "simple(59) should contain hashes of redacted map keys"
+        assert len(redacted_payload[simple_59]) == 2, "Should have 2 redacted map keys"
+        print("✓ Tag 58 map keys -> simple(59) hash array")
+
+        # Check that tag 58 array element became tag 60
+        tag_60_element = inspection_dates[1]
+        assert cbor_utils.is_tag(tag_60_element), "Array element should be wrapped in tag"
+        assert cbor_utils.get_tag_number(tag_60_element) == 60, "Should be tag 60"
+        print("✓ Tag 58 array element -> tag 60 wrapped hash")
+
+        # Check that mandatory claims are preserved
+        assert redacted_payload["iss"] == "https://issuer.example"
+        assert redacted_payload["mandatory_claim"] == "always_visible"
+        print("✓ Mandatory claims preserved without redaction")
+
+        # Check that optional claims are absent from payload
+        assert "secret_data" not in redacted_payload
+        assert "optional_info" not in redacted_payload
+        print("✓ Optional claims removed from payload (available via disclosures)")
+
+        # Verify disclosure format
+        assert len(disclosures) == 3, "Should have 3 disclosures (2 map keys + 1 array element)"
+        for disclosure_bytes in disclosures:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            assert len(disclosure) == 3, "Each disclosure should be [salt, value, key]"
+            assert isinstance(disclosure[0], bytes), "Salt should be bytes"
+            assert len(disclosure[0]) == 16, "Salt should be 16 bytes (128 bits)"
+        print("✓ Disclosures follow [salt, value, key] format")
+
+        # Show hash consistency
+        for i, disclosure_bytes in enumerate(disclosures):
+            computed_hash = hash_disclosure(disclosure_bytes)
+            disclosure = cbor_utils.decode(disclosure_bytes)
+
+            if isinstance(disclosure[2], str):  # Map key disclosure
+                assert computed_hash in redacted_payload[simple_59]
+                print(f"✓ Disclosure {i+1} hash matches simple(59) entry")
+            elif isinstance(disclosure[2], int):  # Array element disclosure
+                array_index = disclosure[2]
+                tag_60_hash = cbor_utils.get_tag_value(inspection_dates[array_index])
+                assert computed_hash == tag_60_hash
+                print(f"✓ Disclosure {i+1} hash matches tag 60 in array[{array_index}]")
+
+        print(f"\n=== CBOR EXPORT ===")
+        print(f"CBOR bytes length: {len(cbor_bytes)}")
+        print(f"Hex representation: {cbor_hex}")
+
+        # String comparison checks for exact behavior validation
+        expected_mandatory_claims = ["iss", "sub", "iat", "mandatory_claim"]
+        for claim in expected_mandatory_claims:
+            assert claim in redacted_payload, f"Mandatory claim '{claim}' should be present"
+
+        redacted_claims = ["secret_data", "optional_info"]
+        for claim in redacted_claims:
+            assert claim not in redacted_payload, f"Redacted claim '{claim}' should be absent"
+
+        print("✓ All string comparison checks passed")
+        print("✓ EDN serialization example complete - developers can see exact transformation")
+
+    def test_disclosed_payload_reconstruction_example(self):
+        """Show how disclosed payloads are reconstructed from redacted CBOR + disclosures."""
+        # Same input as previous test for consistency
+        original_edn = """{
+            "company": "ACME Corp",
+            "product_info": {
+                "name": "Widget Pro",
+                "version": "2.1.0"
+            },
+            "confidential": 58("trade_secret_formula"),
+            "customer_list": 58(["CustomerA", "CustomerB", "CustomerC"]),
+            "metrics": [
+                100,
+                58(250),
+                300
+            ]
+        }"""
+
+        # Generate redacted CBOR
+        salt_gen = SeededSaltGenerator(seed=2024)
+        redacted_cbor_bytes, all_disclosures = edn_to_redacted_cbor(original_edn, salt_gen)
+
+        print(f"\n=== ORIGINAL EDN ===")
+        print(original_edn.strip())
+
+        # Show redacted structure
+        redacted_payload = cbor_utils.decode(redacted_cbor_bytes)
+        simple_59 = cbor_utils.create_simple_value(59)
+
+        print(f"\n=== REDACTED CBOR STRUCTURE ===")
+        print(f"Company: {redacted_payload['company']}")
+        print(f"Product info: {redacted_payload['product_info']}")
+        print(f"Metrics array: {redacted_payload['metrics']}")
+
+        # Show which items were redacted
+        metrics = redacted_payload['metrics']
+        metrics_display = []
+        for item in metrics:
+            if cbor_utils.is_tag(item) and cbor_utils.get_tag_number(item) == 60:
+                hash_val = cbor_utils.get_tag_value(item)
+                metrics_display.append(f'60(h\'{hash_val.hex()[:12]}...\')')
+            else:
+                metrics_display.append(str(item))
+
+        hash_array = redacted_payload[simple_59]
+        hash_display = [f'h\'{h.hex()[:12]}...\'' for h in hash_array]
+
+        print(f"Metrics with tag 60: [{', '.join(metrics_display)}]")
+        print(f"Simple(59) hashes: [{', '.join(hash_display)}]")
+        print(f"Missing claims: confidential, customer_list (in disclosures)")
+
+        # Simulate selective disclosure - choose which items to reveal
+        print(f"\n=== SELECTIVE DISCLOSURE SCENARIOS ===")
+
+        # Scenario 1: Disclose only "confidential"
+        selected_disclosures_1 = []
+        revealed_claims_1 = {}
+
+        for disclosure_bytes in all_disclosures:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            salt, value, key = disclosure
+            if key == "confidential":
+                selected_disclosures_1.append(disclosure_bytes)
+                revealed_claims_1[key] = value
+
+        print(f"Scenario 1 - Reveal 'confidential' only:")
+        print(f"  Disclosed: confidential = \"{revealed_claims_1['confidential']}\"")
+        print(f"  Still hidden: customer_list, metrics[1]")
+
+        # Scenario 2: Disclose "customer_list" and array element
+        selected_disclosures_2 = []
+        revealed_claims_2 = {}
+        revealed_array_elements_2 = {}
+
+        for disclosure_bytes in all_disclosures:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            salt, value, key = disclosure
+            if key == "customer_list":
+                selected_disclosures_2.append(disclosure_bytes)
+                revealed_claims_2[key] = value
+            elif key == 1:  # Array index 1
+                selected_disclosures_2.append(disclosure_bytes)
+                revealed_array_elements_2[key] = value
+
+        print(f"Scenario 2 - Reveal 'customer_list' and metrics[1]:")
+        print(f"  Disclosed: customer_list = {revealed_claims_2['customer_list']}")
+        print(f"  Disclosed: metrics[1] = {revealed_array_elements_2[1]}")
+        print(f"  Still hidden: confidential")
+
+        # Show complete reconstructed payload for Scenario 2
+        print(f"\n=== RECONSTRUCTED PAYLOAD (Scenario 2) ===")
+        reconstructed_payload = {
+            "company": redacted_payload["company"],
+            "product_info": redacted_payload["product_info"],
+            "customer_list": revealed_claims_2["customer_list"],  # From disclosure
+            "metrics": [
+                metrics[0],  # Original value 100
+                revealed_array_elements_2[1],  # From disclosure: 250
+                metrics[2]   # Original value 300
+            ]
+            # "confidential" still missing - not disclosed
+        }
+
+        reconstructed_edn = """{
+    "company": "ACME Corp",
+    "product_info": {
+        "name": "Widget Pro",
+        "version": "2.1.0"
+    },
+    "customer_list": ["CustomerA", "CustomerB", "CustomerC"],
+    "metrics": [100, 250, 300]
+}"""
+        print(reconstructed_edn.strip())
+
+        # Export the CBOR bytes for both scenarios
+        print(f"\n=== CBOR EXPORTS ===")
+        print(f"Original redacted CBOR: {redacted_cbor_bytes.hex()}")
+        print(f"Length: {len(redacted_cbor_bytes)} bytes")
+
+        # Validation assertions for string comparisons
+        assert "company" in redacted_payload
+        assert "confidential" not in redacted_payload
+        assert "customer_list" not in redacted_payload
+        assert redacted_payload["company"] == "ACME Corp"
+
+        # Check disclosures contain expected data
+        disclosure_keys = []
+        disclosure_values = []
+        for disclosure_bytes in all_disclosures:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            disclosure_keys.append(disclosure[2])
+            disclosure_values.append(disclosure[1])
+
+        assert "confidential" in disclosure_keys
+        assert "customer_list" in disclosure_keys
+        assert 1 in disclosure_keys  # Array index
+        assert "trade_secret_formula" in disclosure_values
+        assert ["CustomerA", "CustomerB", "CustomerC"] in disclosure_values
+        assert 250 in disclosure_values
+
+        print("✓ String comparison validations passed")
+        print("✓ Developers can now understand redacted vs disclosed payload structures")
+
+    def test_complete_before_after_edn_comparison(self):
+        """Complete before/after EDN comparison showing exact transformation."""
+        # Original EDN input with tag 58 annotations
+        original_edn = """{
+            "iss": "https://manufacturer.example",
+            "sub": "https://buyer.example",
+            "iat": 1703980800,
+            "product": "Steel Rebar",
+            "batch": "B2024-001",
+            "secret_formula": 58("proprietary_mix_v3.2"),
+            "test_results": {
+                "strength": 520,
+                "flexibility": 58(85.5),
+                "internal_notes": 58("passed_with_concerns")
+            },
+            "measurements": [
+                10.5,
+                58(15.2),
+                20.0,
+                58(25.8)
+            ]
+        }"""
+
+        salt_gen = SeededSaltGenerator(seed=12345)
+        cbor_bytes, disclosures = edn_to_redacted_cbor(original_edn, salt_gen)
+        redacted_payload = cbor_utils.decode(cbor_bytes)
+
+        print("\n" + "="*80)
+        print("COMPLETE BEFORE/AFTER EDN TRANSFORMATION COMPARISON")
+        print("="*80)
+
+        print(f"\n>>> BEFORE: Original EDN with tag 58 annotations <<<")
+        print(original_edn.strip())
+
+        # Build the after representation
+        simple_59 = cbor_utils.create_simple_value(59)
+        measurements = redacted_payload["measurements"]
+        test_results = redacted_payload["test_results"]
+
+        # Format measurements array
+        measurements_formatted = []
+        for item in measurements:
+            if cbor_utils.is_tag(item) and cbor_utils.get_tag_number(item) == 60:
+                hash_val = cbor_utils.get_tag_value(item)
+                measurements_formatted.append(f'60(h\'{hash_val.hex()[:8]}...\')')
+            else:
+                measurements_formatted.append(str(item))
+
+        # Format simple(59) hashes
+        hash_array = redacted_payload[simple_59]
+        formatted_hashes = []
+        for hash_bytes in hash_array:
+            formatted_hashes.append(f'h\'{hash_bytes.hex()[:8]}...\'')
+
+        redacted_edn_display = f"""{{
+    "iss": "{redacted_payload['iss']}",
+    "sub": "{redacted_payload['sub']}",
+    "iat": {redacted_payload['iat']},
+    "product": "{redacted_payload['product']}",
+    "batch": "{redacted_payload['batch']}",
+    "test_results": {{
+        "strength": {test_results['strength']}
+    }},
+    "measurements": [{', '.join(measurements_formatted)}],
+    simple(59): [{', '.join(formatted_hashes)}]
+}}"""
+
+        print(f"\n>>> AFTER: Redacted CBOR structure (as EDN) <<<")
+        print(redacted_edn_display.strip())
+
+        print(f"\n>>> KEY TRANSFORMATIONS <<<")
+        print("• Tag 58 map keys → simple(59) hash array entries")
+        print("• Tag 58 array elements → tag 60 wrapped hashes")
+        print("• Redacted values moved to separate disclosures")
+        print("• Mandatory claims preserved as-is")
+
+        print(f"\n>>> CBOR HEX EXPORT <<<")
+        cbor_hex = cbor_bytes.hex()
+        print(f"Length: {len(cbor_bytes)} bytes")
+        print(f"Hex: {cbor_hex}")
+
+        print(f"\n>>> DISCLOSURES BREAKDOWN <<<")
+        for i, disclosure_bytes in enumerate(disclosures, 1):
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            salt, value, key = disclosure
+            salt_display = salt.hex()[:8] + "..."
+
+            if isinstance(value, str):
+                value_display = f'"{value}"'
+            elif isinstance(key, int):
+                value_display = f"{value} (array element at index {key})"
+            else:
+                value_display = str(value)
+
+            key_display = f'"{key}"' if isinstance(key, str) else f"array[{key}]"
+            print(f"  {i}. [{salt_display}, {value_display}, {key_display}]")
+
+        # String comparison assertions
+        print(f"\n>>> VALIDATION ASSERTIONS <<<")
+
+        # Check preserved claims
+        preserved_claims = ["iss", "sub", "iat", "product", "batch"]
+        for claim in preserved_claims:
+            assert claim in redacted_payload, f"Claim '{claim}' should be preserved"
+        print("✓ Mandatory claims preserved")
+
+        # Check redacted claims
+        redacted_claims = ["secret_formula"]
+        for claim in redacted_claims:
+            assert claim not in redacted_payload, f"Claim '{claim}' should be redacted"
+        print("✓ Tagged claims properly redacted")
+
+        # Check partially redacted objects
+        assert "test_results" in redacted_payload
+        assert "strength" in redacted_payload["test_results"]
+        assert "flexibility" not in redacted_payload["test_results"]
+        assert "internal_notes" not in redacted_payload["test_results"]
+        print("✓ Nested objects partially redacted correctly")
+
+        # Check array transformations
+        assert len(measurements) == 4
+        assert measurements[0] == 10.5  # Preserved
+        assert cbor_utils.is_tag(measurements[1])  # Tag 60
+        assert measurements[2] == 20.0  # Preserved
+        assert cbor_utils.is_tag(measurements[3])  # Tag 60
+        print("✓ Array elements transformed correctly")
+
+        # Check simple(59) structure
+        assert simple_59 in redacted_payload
+        assert isinstance(redacted_payload[simple_59], list)
+        assert len(redacted_payload[simple_59]) == 3  # 3 redacted map keys
+        print("✓ Simple(59) contains correct number of hashes")
+
+        # Check disclosure count and format
+        assert len(disclosures) == 5  # 3 map keys + 2 array elements
+        for disclosure_bytes in disclosures:
+            disclosure = cbor_utils.decode(disclosure_bytes)
+            assert len(disclosure) == 3
+            assert isinstance(disclosure[0], bytes)
+            assert len(disclosure[0]) == 16  # 128-bit salt
+        print("✓ All disclosures properly formatted")
+
+        print(f"\n✓ Complete before/after comparison successful!")
+        print("✓ Developers can see exact EDN transformation with CBOR exports")
+
