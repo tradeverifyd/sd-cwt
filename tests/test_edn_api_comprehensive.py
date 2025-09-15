@@ -29,7 +29,7 @@ class TestEDNAPIComprehensive:
         holder_public_key = holder_key_dict.copy()
         if -4 in holder_public_key:
             del holder_public_key[-4]
-        holder_public_key_cbor = cbor_utils.encode(holder_public_key)
+        # holder_public_key_cbor = cbor_utils.encode(holder_public_key)  # Not used in this test
 
         # Step 2: Create EDN with mandatory and optional claims (matching specification examples)
         edn_specification = """{
@@ -351,7 +351,7 @@ class TestEDNAPIComprehensive:
         # Validate disclosure count and format
         assert len(disclosures) == 5  # 4 map keys + 1 array element
 
-        for i, disclosure_bytes in enumerate(disclosures):
+        for _i, disclosure_bytes in enumerate(disclosures):
             # Validate each disclosure is proper CBOR
             disclosure_hex = disclosure_bytes.hex()
             assert len(disclosure_hex) > 0

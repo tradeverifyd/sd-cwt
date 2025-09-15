@@ -213,7 +213,8 @@ class TestSimpleAPIWorkflow:
         from sd_cwt.simple_api import SDCWTVerifier
 
         # Create a mock verifier to test tag detection
-        mock_resolver = lambda kid: {"mock": "key"}
+        def mock_resolver(kid):
+            return {"mock": "key"}
         verifier = SDCWTVerifier(mock_resolver)
 
         # Test payload with no redaction tags (clean)
@@ -238,7 +239,8 @@ class TestSimpleAPIWorkflow:
         # Test with invalid KBT
         from sd_cwt.simple_api import SDCWTVerifier
 
-        mock_resolver = lambda kid: {"mock": "key"}
+        def mock_resolver(kid):
+            return {"mock": "key"}
         verifier = SDCWTVerifier(mock_resolver)
 
         # Invalid KBT should return False

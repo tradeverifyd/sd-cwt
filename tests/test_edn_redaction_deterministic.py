@@ -458,24 +458,24 @@ class TestEDNRedactionDeterministic:
 
         # Get the CBOR hex for export
         cbor_hex = cbor_bytes.hex()
-        print(f"\n=== REDACTED CBOR (hex) ===")
+        print("\n=== REDACTED CBOR (hex) ===")
         print(f"{cbor_hex}")
 
         # Decode to show the redacted structure
         redacted_payload = cbor_utils.decode(cbor_bytes)
 
         # Show what the redacted EDN looks like conceptually
-        print(f"\n=== ORIGINAL EDN (with tag 58 annotations) ===")
+        print("\n=== ORIGINAL EDN (with tag 58 annotations) ===")
         print(original_edn.strip())
 
-        print(f"\n=== REDACTED EDN STRUCTURE (after processing) ===")
+        print("\n=== REDACTED EDN STRUCTURE (after processing) ===")
         # Build the redacted EDN representation for display
         simple_59 = cbor_utils.create_simple_value(59)
 
         # Format the inspection dates array showing tag 60
         inspection_dates = redacted_payload["inspection_dates"]
         formatted_dates = []
-        for i, date in enumerate(inspection_dates):
+        for _i, date in enumerate(inspection_dates):
             if cbor_utils.is_tag(date) and cbor_utils.get_tag_number(date) == 60:
                 hash_value = cbor_utils.get_tag_value(date)
                 formatted_dates.append(f'60(h\'{hash_value.hex()[:16]}...\')')  # Show first 16 hex chars
@@ -499,7 +499,7 @@ class TestEDNRedactionDeterministic:
 
         print(redacted_edn_display)
 
-        print(f"\n=== DISCLOSURES (salt, value, key format) ===")
+        print("\n=== DISCLOSURES (salt, value, key format) ===")
         for i, disclosure_bytes in enumerate(disclosures):
             disclosure = cbor_utils.decode(disclosure_bytes)
             salt_hex = disclosure[0].hex()[:16]  # First 16 hex chars
@@ -514,7 +514,7 @@ class TestEDNRedactionDeterministic:
             print(f"Disclosure {i+1}: [h'{salt_hex}...', {value_str}, \"{key}\"]")
 
         # Validation assertions for developers to understand behavior
-        print(f"\n=== VALIDATION CHECKS ===")
+        print("\n=== VALIDATION CHECKS ===")
 
         # Check that tag 58 map keys became simple(59) entries
         assert simple_59 in redacted_payload, "simple(59) should contain hashes of redacted map keys"
@@ -560,7 +560,7 @@ class TestEDNRedactionDeterministic:
                 assert computed_hash == tag_60_hash
                 print(f"✓ Disclosure {i+1} hash matches tag 60 in array[{array_index}]")
 
-        print(f"\n=== CBOR EXPORT ===")
+        print("\n=== CBOR EXPORT ===")
         print(f"CBOR bytes length: {len(cbor_bytes)}")
         print(f"Hex representation: {cbor_hex}")
 
@@ -598,14 +598,14 @@ class TestEDNRedactionDeterministic:
         salt_gen = SeededSaltGenerator(seed=2024)
         redacted_cbor_bytes, all_disclosures = edn_to_redacted_cbor(original_edn, salt_gen)
 
-        print(f"\n=== ORIGINAL EDN ===")
+        print("\n=== ORIGINAL EDN ===")
         print(original_edn.strip())
 
         # Show redacted structure
         redacted_payload = cbor_utils.decode(redacted_cbor_bytes)
         simple_59 = cbor_utils.create_simple_value(59)
 
-        print(f"\n=== REDACTED CBOR STRUCTURE ===")
+        print("\n=== REDACTED CBOR STRUCTURE ===")
         print(f"Company: {redacted_payload['company']}")
         print(f"Product info: {redacted_payload['product_info']}")
         print(f"Metrics array: {redacted_payload['metrics']}")
@@ -625,10 +625,10 @@ class TestEDNRedactionDeterministic:
 
         print(f"Metrics with tag 60: [{', '.join(metrics_display)}]")
         print(f"Simple(59) hashes: [{', '.join(hash_display)}]")
-        print(f"Missing claims: confidential, customer_list (in disclosures)")
+        print("Missing claims: confidential, customer_list (in disclosures)")
 
         # Simulate selective disclosure - choose which items to reveal
-        print(f"\n=== SELECTIVE DISCLOSURE SCENARIOS ===")
+        print("\n=== SELECTIVE DISCLOSURE SCENARIOS ===")
 
         # Scenario 1: Disclose only "confidential"
         selected_disclosures_1 = []
@@ -641,9 +641,9 @@ class TestEDNRedactionDeterministic:
                 selected_disclosures_1.append(disclosure_bytes)
                 revealed_claims_1[key] = value
 
-        print(f"Scenario 1 - Reveal 'confidential' only:")
+        print("Scenario 1 - Reveal 'confidential' only:")
         print(f"  Disclosed: confidential = \"{revealed_claims_1['confidential']}\"")
-        print(f"  Still hidden: customer_list, metrics[1]")
+        print("  Still hidden: customer_list, metrics[1]")
 
         # Scenario 2: Disclose "customer_list" and array element
         selected_disclosures_2 = []
@@ -660,24 +660,24 @@ class TestEDNRedactionDeterministic:
                 selected_disclosures_2.append(disclosure_bytes)
                 revealed_array_elements_2[key] = value
 
-        print(f"Scenario 2 - Reveal 'customer_list' and metrics[1]:")
+        print("Scenario 2 - Reveal 'customer_list' and metrics[1]:")
         print(f"  Disclosed: customer_list = {revealed_claims_2['customer_list']}")
         print(f"  Disclosed: metrics[1] = {revealed_array_elements_2[1]}")
-        print(f"  Still hidden: confidential")
+        print("  Still hidden: confidential")
 
         # Show complete reconstructed payload for Scenario 2
-        print(f"\n=== RECONSTRUCTED PAYLOAD (Scenario 2) ===")
-        reconstructed_payload = {
-            "company": redacted_payload["company"],
-            "product_info": redacted_payload["product_info"],
-            "customer_list": revealed_claims_2["customer_list"],  # From disclosure
-            "metrics": [
-                metrics[0],  # Original value 100
-                revealed_array_elements_2[1],  # From disclosure: 250
-                metrics[2]   # Original value 300
-            ]
-            # "confidential" still missing - not disclosed
-        }
+        print("\n=== RECONSTRUCTED PAYLOAD (Scenario 2) ===")
+        # reconstructed_payload = {
+        #     "company": redacted_payload["company"],
+        #     "product_info": redacted_payload["product_info"],
+        #     "customer_list": revealed_claims_2["customer_list"],  # From disclosure
+        #     "metrics": [
+        #         metrics[0],  # Original value 100
+        #         revealed_array_elements_2[1],  # From disclosure: 250
+        #         metrics[2]   # Original value 300
+        #     ]
+        #     # "confidential" still missing - not disclosed
+        # }
 
         reconstructed_edn = """{
     "company": "ACME Corp",
@@ -691,7 +691,7 @@ class TestEDNRedactionDeterministic:
         print(reconstructed_edn.strip())
 
         # Export the CBOR bytes for both scenarios
-        print(f"\n=== CBOR EXPORTS ===")
+        print("\n=== CBOR EXPORTS ===")
         print(f"Original redacted CBOR: {redacted_cbor_bytes.hex()}")
         print(f"Length: {len(redacted_cbor_bytes)} bytes")
 
@@ -750,7 +750,7 @@ class TestEDNRedactionDeterministic:
         print("COMPLETE BEFORE/AFTER EDN TRANSFORMATION COMPARISON")
         print("="*80)
 
-        print(f"\n>>> BEFORE: Original EDN with tag 58 annotations <<<")
+        print("\n>>> BEFORE: Original EDN with tag 58 annotations <<<")
         print(original_edn.strip())
 
         # Build the after representation
@@ -786,21 +786,21 @@ class TestEDNRedactionDeterministic:
     simple(59): [{', '.join(formatted_hashes)}]
 }}"""
 
-        print(f"\n>>> AFTER: Redacted CBOR structure (as EDN) <<<")
+        print("\n>>> AFTER: Redacted CBOR structure (as EDN) <<<")
         print(redacted_edn_display.strip())
 
-        print(f"\n>>> KEY TRANSFORMATIONS <<<")
+        print("\n>>> KEY TRANSFORMATIONS <<<")
         print("• Tag 58 map keys → simple(59) hash array entries")
         print("• Tag 58 array elements → tag 60 wrapped hashes")
         print("• Redacted values moved to separate disclosures")
         print("• Mandatory claims preserved as-is")
 
-        print(f"\n>>> CBOR HEX EXPORT <<<")
+        print("\n>>> CBOR HEX EXPORT <<<")
         cbor_hex = cbor_bytes.hex()
         print(f"Length: {len(cbor_bytes)} bytes")
         print(f"Hex: {cbor_hex}")
 
-        print(f"\n>>> DISCLOSURES BREAKDOWN <<<")
+        print("\n>>> DISCLOSURES BREAKDOWN <<<")
         for i, disclosure_bytes in enumerate(disclosures, 1):
             disclosure = cbor_utils.decode(disclosure_bytes)
             salt, value, key = disclosure
@@ -817,7 +817,7 @@ class TestEDNRedactionDeterministic:
             print(f"  {i}. [{salt_display}, {value_display}, {key_display}]")
 
         # String comparison assertions
-        print(f"\n>>> VALIDATION ASSERTIONS <<<")
+        print("\n>>> VALIDATION ASSERTIONS <<<")
 
         # Check preserved claims
         preserved_claims = ["iss", "sub", "iat", "product", "batch"]
@@ -861,6 +861,6 @@ class TestEDNRedactionDeterministic:
             assert len(disclosure[0]) == 16  # 128-bit salt
         print("✓ All disclosures properly formatted")
 
-        print(f"\n✓ Complete before/after comparison successful!")
+        print("\n✓ Complete before/after comparison successful!")
         print("✓ Developers can see exact EDN transformation with CBOR exports")
 
