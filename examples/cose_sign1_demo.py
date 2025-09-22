@@ -2,14 +2,16 @@
 """Demo script for COSE Sign1 functionality."""
 
 import json
+
 from sd_cwt import (
     CoseAlgorithm,
     cose_key_generate,
-    cose_key_to_dict,
     cose_key_get_public,
+    cose_key_to_dict,
     cose_sign1_sign,
     cose_sign1_verify,
 )
+
 # Import internal implementations for demo purposes
 from sd_cwt.cose_sign1 import (
     ES256Signer,
@@ -161,7 +163,7 @@ def demo_external_aad():
     payload = b"Sensitive data"
     external_aad = b"context-12345"
 
-    print(f"\n1. Signing with external AAD:")
+    print("\n1. Signing with external AAD:")
     print(f"   Payload: {payload.decode()}")
     print(f"   External AAD: {external_aad.decode()}")
 
