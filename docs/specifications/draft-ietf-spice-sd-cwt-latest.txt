@@ -5,16 +5,15 @@
 Secure Patterns for Internet CrEdentials                      M. Prorock
 Internet-Draft                                                  mesur.io
 Intended status: Standards Track                               O. Steele
-Expires: 21 March 2026                                      Tradeverifyd
+Expires: 23 April 2026                                      Tradeverifyd
                                                              H. Birkholz
                                                           Fraunhofer SIT
                                                                  R. Mahy
-                                          Rohan Mahy Consulting Services
-                                                       17 September 2025
+                                                         20 October 2025
 
 
              Selective Disclosure CBOR Web Tokens (SD-CWT)
-                     draft-ietf-spice-sd-cwt-latest
+                       draft-ietf-spice-sd-cwt-05
 
 Abstract
 
@@ -51,12 +50,20 @@ Status of This Memo
    working documents as Internet-Drafts.  The list of current Internet-
    Drafts is at https://datatracker.ietf.org/drafts/current/.
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 1]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Internet-Drafts are draft documents valid for a maximum of six months
    and may be updated, replaced, or obsoleted by other documents at any
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 21 March 2026.
+   This Internet-Draft will expire on 23 April 2026.
 
 Copyright Notice
 
@@ -74,88 +81,120 @@ Copyright Notice
 
 Table of Contents
 
-   1.  Introduction
-     1.1.  High-Level Flow
-   2.  Terminology
-   3.  Overview of Selective Disclosure CWT
-     3.1.  A CWT without Selective Disclosure
-     3.2.  Holder gets an SD-CWT from the Issuer
-   4.  Holder prepares an SD-CWT for a Verifier
-   5.  Differences from the CBOR Web Token Specification
-   6.  SD-CWT Definition
-     6.1.  Types of Blinded Claims
-   7.  SD-CWT Issuance
-     7.1.  Issuer Generation
-     7.2.  Holder Validation
-   8.  SD-CWT Presentation
-     8.1.  Creating a Key Binding Token
-   9.  SD-KBT and SD-CWT Verifier Validation
-   10. Decoy Digests
-   11. Encrypted Disclosures
-     11.1.  AEAD Encrypted Disclosures Mechanism
-   12. Credential Types
-   13. Examples
-     13.1.  Minimal Spanning Example
-     13.2.  Nested Example
-   14. To Be Redacted Tag Definition
-   15. Privacy Considerations
-     15.1.  Correlation
-     15.2.  Determinism
-     15.3.  Audience
-     15.4.  Credential Types
-   16. Security Considerations
-     16.1.  Issuer Key Compromise
-     16.2.  Disclosure Coercion and Over-identification
-     16.3.  Threat Model Development Guidance
-     16.4.  Random Numbers
-     16.5.  Binding the KBT and the CWT
-     16.6.  Covert Channels
-     16.7.  Nested Disclosure Ordering
-   17. IANA Considerations
-     17.1.  COSE Header Parameters
-       17.1.1.  sd_claims
-       17.1.2.  sd_alg
-       17.1.3.  sd_aead_encrypted_claims
-       17.1.4.  sd_aead
-     17.2.  CBOR Simple Values
-     17.3.  CBOR Tags
-       17.3.1.  To Be Redacted Tag
-       17.3.2.  Redacted Claim Element Tag
-     17.4.  CBOR Web Token (CWT) Claims
-       17.4.1.  vct
-     17.5.  Media Types
-       17.5.1.  application/sd-cwt
-       17.5.2.  application/kb+cwt
-     17.6.  Structured Syntax Suffix
-     17.7.  Content-Formats
-     17.8.  Verifiable Credential Type Identifiers
-       17.8.1.  Registration Template
-       17.8.2.  Initial Registry Contents
-   18. References
-     18.1.  Normative References
-     18.2.  Informative References
-   Appendix A.  Complete CDDL Schema
-   Appendix B.  Comparison to SD-JWT
-     B.1.  Media Types
-     B.2.  Redaction Claims
-     B.3.  Issuance
-     B.4.  Presentation
-     B.5.  Validation
-   Appendix C.  Keys Used in the Examples
-     C.1.  Subject / Holder
-     C.2.  Issuer
-   Appendix D.  Implementation Status
-     D.1.  Transmute Prototype
-     D.2.  Rust Prototype
-   Appendix E.  Document History
-     E.1.  draft-ietf-spice-sd-cwt-04
-     E.2.  draft-ietf-spice-sd-cwt-03
-     E.3.  draft-ietf-spice-sd-cwt-02
-     E.4.  draft-ietf-spice-sd-cwt-01
-     E.5.  draft-ietf-spice-sd-cwt-00
-   Acknowledgments
-   Contributors
-   Authors' Addresses
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   4
+     1.1.  High-Level Flow . . . . . . . . . . . . . . . . . . . . .   5
+   2.  Terminology . . . . . . . . . . . . . . . . . . . . . . . . .   6
+   3.  Overview of Selective Disclosure CWT  . . . . . . . . . . . .  10
+     3.1.  A CWT without Selective Disclosure  . . . . . . . . . . .  10
+     3.2.  Holder gets an SD-CWT from the Issuer . . . . . . . . . .  11
+   4.  Holder prepares an SD-CWT for a Verifier  . . . . . . . . . .  15
+   5.  Differences from the CBOR Web Token Specification . . . . . .  16
+   6.  SD-CWT Definition . . . . . . . . . . . . . . . . . . . . . .  17
+     6.1.  Types of Blinded Claims . . . . . . . . . . . . . . . . .  17
+   7.  SD-CWT Issuance . . . . . . . . . . . . . . . . . . . . . . .  18
+     7.1.  Issuer Generation . . . . . . . . . . . . . . . . . . . .  19
+     7.2.  Holder Validation . . . . . . . . . . . . . . . . . . . .  19
+   8.  SD-CWT Presentation . . . . . . . . . . . . . . . . . . . . .  21
+     8.1.  Creating a Key Binding Token  . . . . . . . . . . . . . .  22
+   9.  SD-KBT and SD-CWT Verifier Validation . . . . . . . . . . . .  23
+   10. Decoy Digests . . . . . . . . . . . . . . . . . . . . . . . .  24
+   11. Encrypted Disclosures . . . . . . . . . . . . . . . . . . . .  24
+     11.1.  AEAD Encrypted Disclosures Mechanism . . . . . . . . . .  25
+   12. Credential Types  . . . . . . . . . . . . . . . . . . . . . .  27
+   13. Examples  . . . . . . . . . . . . . . . . . . . . . . . . . .  27
+     13.1.  Minimal Spanning Example . . . . . . . . . . . . . . . .  27
+     13.2.  Nested Example . . . . . . . . . . . . . . . . . . . . .  29
+   14. To Be Redacted Tag Definition . . . . . . . . . . . . . . . .  33
+   15. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  33
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 2]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+     15.1.  Correlation  . . . . . . . . . . . . . . . . . . . . . .  34
+     15.2.  Determinism  . . . . . . . . . . . . . . . . . . . . . .  34
+     15.3.  Audience . . . . . . . . . . . . . . . . . . . . . . . .  34
+     15.4.  Credential Types . . . . . . . . . . . . . . . . . . . .  34
+   16. Security Considerations . . . . . . . . . . . . . . . . . . .  35
+     16.1.  Issuer Key Compromise  . . . . . . . . . . . . . . . . .  35
+     16.2.  Disclosure Coercion and Over-identification  . . . . . .  36
+     16.3.  Threat Model Development Guidance  . . . . . . . . . . .  37
+     16.4.  Random Numbers . . . . . . . . . . . . . . . . . . . . .  38
+     16.5.  Binding the KBT and the CWT  . . . . . . . . . . . . . .  39
+     16.6.  Covert Channels  . . . . . . . . . . . . . . . . . . . .  39
+     16.7.  Nested Disclosure Ordering . . . . . . . . . . . . . . .  39
+     16.8.  Choice of AEAD algorithms  . . . . . . . . . . . . . . .  40
+   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  40
+     17.1.  COSE Header Parameters . . . . . . . . . . . . . . . . .  40
+       17.1.1.  sd_claims  . . . . . . . . . . . . . . . . . . . . .  40
+       17.1.2.  sd_alg . . . . . . . . . . . . . . . . . . . . . . .  41
+       17.1.3.  sd_aead_encrypted_claims . . . . . . . . . . . . . .  41
+       17.1.4.  sd_aead  . . . . . . . . . . . . . . . . . . . . . .  41
+     17.2.  CBOR Simple Values . . . . . . . . . . . . . . . . . . .  42
+     17.3.  CBOR Tags  . . . . . . . . . . . . . . . . . . . . . . .  42
+       17.3.1.  To Be Redacted Tag . . . . . . . . . . . . . . . . .  42
+       17.3.2.  Redacted Claim Element Tag . . . . . . . . . . . . .  42
+     17.4.  CBOR Web Token (CWT) Claims  . . . . . . . . . . . . . .  43
+       17.4.1.  vct  . . . . . . . . . . . . . . . . . . . . . . . .  43
+     17.5.  Media Types  . . . . . . . . . . . . . . . . . . . . . .  43
+       17.5.1.  application/sd-cwt . . . . . . . . . . . . . . . . .  43
+       17.5.2.  application/kb+cwt . . . . . . . . . . . . . . . . .  44
+     17.6.  Structured Syntax Suffix . . . . . . . . . . . . . . . .  45
+     17.7.  Content-Formats  . . . . . . . . . . . . . . . . . . . .  46
+     17.8.  Verifiable Credential Type Identifiers . . . . . . . . .  46
+       17.8.1.  Registration Template  . . . . . . . . . . . . . . .  48
+       17.8.2.  Initial Registry Contents  . . . . . . . . . . . . .  48
+   18. References  . . . . . . . . . . . . . . . . . . . . . . . . .  48
+     18.1.  Normative References . . . . . . . . . . . . . . . . . .  48
+     18.2.  Informative References . . . . . . . . . . . . . . . . .  50
+   Appendix A.  Complete CDDL Schema . . . . . . . . . . . . . . . .  51
+   Appendix B.  Comparison to SD-JWT . . . . . . . . . . . . . . . .  54
+     B.1.  Media Types . . . . . . . . . . . . . . . . . . . . . . .  54
+     B.2.  Redaction Claims  . . . . . . . . . . . . . . . . . . . .  54
+     B.3.  Issuance  . . . . . . . . . . . . . . . . . . . . . . . .  54
+     B.4.  Presentation  . . . . . . . . . . . . . . . . . . . . . .  55
+     B.5.  Validation  . . . . . . . . . . . . . . . . . . . . . . .  55
+   Appendix C.  Keys Used in the Examples  . . . . . . . . . . . . .  55
+     C.1.  Subject / Holder  . . . . . . . . . . . . . . . . . . . .  55
+     C.2.  Issuer  . . . . . . . . . . . . . . . . . . . . . . . . .  57
+   Appendix D.  Implementation Status  . . . . . . . . . . . . . . .  59
+     D.1.  Transmute Prototype . . . . . . . . . . . . . . . . . . .  59
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 3]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+     D.2.  Rust Prototype  . . . . . . . . . . . . . . . . . . . . .  60
+   Appendix E.  Relationship between RATS Architecture and Verifiable
+           Credentials . . . . . . . . . . . . . . . . . . . . . . .  60
+     E.1.  Three-Party Verifiable Credentials Model  . . . . . . . .  60
+     E.2.  RATS Architecture Roles . . . . . . . . . . . . . . . . .  61
+     E.3.  Role Mappings in the Three-Party Model  . . . . . . . . .  61
+       E.3.1.  Verifiable Credential Issuer as RATS Endorser . . . .  61
+       E.3.2.  Verifiable Credential Holder as RATS Verifier . . . .  62
+       E.3.3.  Verifiable Credential Verifier as RATS Relying
+               Party . . . . . . . . . . . . . . . . . . . . . . . .  62
+       E.3.4.  All Parties Can Be Attesters  . . . . . . . . . . . .  63
+     E.4.  Comparison with RATS Interaction Models . . . . . . . . .  63
+     E.5.  Roles That Don't Map to the Three-Party Model . . . . . .  64
+     E.6.  Application to SD-CWT . . . . . . . . . . . . . . . . . .  64
+   Appendix F.  Sample Disclosure Matching Algorithm for Verifier  .  65
+   Appendix G.  Document History . . . . . . . . . . . . . . . . . .  66
+     G.1.  draft-ietf-spice-sd-cwt-05  . . . . . . . . . . . . . . .  66
+     G.2.  draft-ietf-spice-sd-cwt-04  . . . . . . . . . . . . . . .  66
+     G.3.  draft-ietf-spice-sd-cwt-03  . . . . . . . . . . . . . . .  67
+     G.4.  draft-ietf-spice-sd-cwt-02  . . . . . . . . . . . . . . .  68
+     G.5.  draft-ietf-spice-sd-cwt-01  . . . . . . . . . . . . . . .  68
+     G.6.  draft-ietf-spice-sd-cwt-00  . . . . . . . . . . . . . . .  69
+   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . .  69
+   Contributors  . . . . . . . . . . . . . . . . . . . . . . . . . .  69
+   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  69
 
 1.  Introduction
 
@@ -168,6 +207,24 @@ Table of Contents
    [RFC9052] and CWT.  This specification enables Holders of CWT-based
    credentials to prove the integrity and authenticity of selected
    attributes asserted by an Issuer about a Subject to a Verifier.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 4]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    Although techniques such as one time use and batch issuance can
    improve the confidentiality and security characteristics of CWT-based
@@ -185,21 +242,52 @@ Table of Contents
    Claims Sets contain Claim Keys and Claim Values.  SD-CWT enables
    Issuers to mark certain Claim Keys or Claim Values mandatory or
    optional for a Holder of a CWT to disclose.  A Verifier that does not
-   understand selective disclosure at all cannot process redacted Claim
-   Keys sent by the Holder.  However, Claim Keys and Claim Values that
-   are not understood remain ignored, as described in Section 3 of
+   understand selective disclosure at all can only act on unblinded
+   claims sent by the Holder; it will ignore Blinded Claims representing
+   array items, and will fail to process any SD-CWT containing Blinded
+   Claims that represent map keys. optional Claim Keys, whether they are
+   disclosed or not, can only be processed by a Verifier that
+   understands this specification.  However, Claim Keys and Claim Values
+   that are not understood remain ignored, as described in Section 3 of
    [RFC8392].
 
 1.1.  High-Level Flow
 
    Figure 1: High-level SD-CWT Issuance and Presentation Flow
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 5]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
 Issuer                           Holder                         Verifier
   |                                |                                 |
   |                                +---+                             |
   |                                |   | Key Gen                     |
   |        Request SD-CWT          |<--+                             |
-  |<-------------------------------|                                 |
+  |<-------------------------------+                                 |
   |                                |                                 |
   +------------------------------->|             Request Nonce       |
   |        Receive SD-CWT          +-------------------------------->|
@@ -242,6 +330,13 @@ Issuer                           Holder                         Verifier
 
    This specification uses terms from CWT [RFC8392], COSE [RFC9052]
    [RFC9053] and JWT [RFC7519].
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 6]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    The terms Claim Name, Claim Key, and Claim Value are defined in
    [RFC8392].
@@ -292,6 +387,13 @@ Issuer                           Holder                         Verifier
    Redacted Claim Element:  The hash of an element redacted from an
       array data structure.
 
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 7]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Presented Disclosed Claims Set:  The CBOR map containing zero or more
       Redacted Claim Keys or Redacted Claim Elements.
 
@@ -338,6 +440,15 @@ Issuer                           Holder                         Verifier
    +------------------------------------------+
    | Validated Disclosed Claim Set            |
    +------------------------------------------+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 8]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    This diagram relates the terminology specific to selective disclosure
    and redaction.
@@ -387,6 +498,14 @@ Issuer                           Holder                         Verifier
          v
    +------------------------------------------+
    | Blinded Claim Hash (computed)            |
+
+
+
+Prorock, et al.           Expires 23 April 2026                 [Page 9]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    +-----+------------------------------------+
          |
          | 6. Matches with hash in payload
@@ -407,6 +526,41 @@ Issuer                           Holder                         Verifier
    [I-D.ietf-cbor-edn-literals].  Note that some of the CWT claim map
    keys shown in the examples have been invented for this example and do
    not have registered integer keys.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 10]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    {
        / iss / 1  : "https://issuer.example",
@@ -452,6 +606,17 @@ Issuer                           Holder                         Verifier
    country of the inspection will be claims that are always present in
    the SD-CWT.  After the Holder requests an SD-CWT from the Issuer, the
    Issuer generates the following SD-CWT:
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 11]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    / cose-sign1 / 18([  / issuer SD-CWT /
      / CWT protected / << {
@@ -501,6 +666,14 @@ Issuer                           Holder                         Verifier
                          2022fd0d3024b5af18c7cc61ad527a2d',
            / y /   -3: h'4dc7ae2c677e96d0cc82597655ce92d5
                          503f54293d87875d1e79ce4770194343'
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 12]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
          }
        },
        /most_recent_inspection_passed/ 500: true,
@@ -546,6 +719,16 @@ Issuer                           Holder                         Verifier
    inspector_license_number claim is a Salted Disclosed Claim,
    consisting of a per-disclosure random salt, the Claim Key, and Claim
    Value.
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 13]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
            <<[
                /salt/   h'bae611067bb823486797da1ebbb52f83',
@@ -595,6 +778,14 @@ Issuer                           Holder                         Verifier
       Figure 5: redacted inspector_license_number claim in the issued
                                 CWT payload
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 14]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
 4.  Holder prepares an SD-CWT for a Verifier
 
    When the Holder wants to send an SD-CWT and disclose none, some, or
@@ -636,6 +827,20 @@ Issuer                           Holder                         Verifier
 
    The issued SD-CWT is placed in the kcwt (Confirmation Key CWT)
    protected header field (defined in [RFC9528]).
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 15]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    / cose-sign1 / 18( / sd_kbt / [
      / KBT protected / << {
@@ -683,6 +888,15 @@ Issuer                           Holder                         Verifier
       represented in hex as 03, an integer key of -2 is represented in
       hex as 21, and a tag of 60 wrapping a 3 is represented in hex as
       D8 3C 03
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 16]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    Note that Holders presenting to a Verifier that does not support this
    specification would need to present a CWT without tagged map keys or
@@ -732,6 +946,14 @@ Issuer                           Holder                         Verifier
    salt, the disclosed value, and the name of the redacted element.  For
    Salted Disclosed Claims of items in an array, the name is omitted.
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 17]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    ; an array of bstr-encoded Salted Disclosed Claims
    salted-array = [ *bstr-encoded-salted ]
 
@@ -780,6 +1002,14 @@ Issuer                           Holder                         Verifier
    matter, which is not discussed in this specification.  This
    specification defines the format of an SD-CWT communicated between an
    Issuer and a Holder in this section, and describes the format of a
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 18]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Key Binding Token containing that SD-CWT communicated between a
    Holder and a Verifier in Section 8.
 
@@ -828,6 +1058,14 @@ Issuer                           Holder                         Verifier
 
    *  the issuer (iss) and subject (sub) are correct;
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 19]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  if an audience (aud) is present, it is acceptable;
 
    *  the CWT is valid according to the nbf and exp claims, if present;
@@ -858,6 +1096,31 @@ Issuer                           Holder                         Verifier
 
    The following informative CDDL is provided to describe the syntax for
    SD-CWT issuance.  A complete CDDL schema is in Appendix A.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 20]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    sd-cwt-issued = #6.18([
       protected: bstr .cbor sd-protected,
@@ -908,6 +1171,13 @@ Issuer                           Holder                         Verifier
    Salted Disclosed Claims in the sd_claims header parameter of the
    unprotected header.
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 21]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    An SD-CWT presentation to a Verifier has the same syntax as an SD-CWT
    issued to a Holder, except the Holder chooses the subset of
    disclosures included in the sd_claims header parameter.
@@ -956,6 +1226,14 @@ Issuer                           Holder                         Verifier
    *  the Holder's disclosure is linked to the creation time (iat) of
       the key binding.
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 22]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    The SD-KBT prevents an attacker from copying and pasting disclosures,
    or from adding or removing disclosures without detection.
    Confirmation is established according to [RFC8747], using the cnf
@@ -1003,6 +1281,15 @@ Issuer                           Holder                         Verifier
    1.  First the Verifier must open the protected headers of the SD-KBT
        and find the Issuer SD-CWT present in the kcwt field.
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 23]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    2.  Next, the Verifier must validate the SD-CWT as described in
        Section 7.2 of [RFC8392].
 
@@ -1012,35 +1299,14 @@ Issuer                           Holder                         Verifier
    4.  Using the confirmation key, the Verifier validates the SD-KBT as
        described in Section 7.2 of [RFC8392].
 
-   5.  Finally, the Verifier MUST extract and decode the disclosed
-       claims from the sd_claims header parameter in the unprotected
-       header of the SD-CWT.  The decoded sd_claims are converted to an
-       intermediate data structure called a Digest To Disclosed Claim
-       Map that is used to transform the Presented Disclosed Claims Set
-       into a Validated Disclosed Claims Set.  The Verifier MUST compute
-       the hash of each Salted Disclosed Claim (salted), in order to
-       match each disclosed value to each entry of the Presented
-       Disclosed Claims Set.  One possible concrete representation of
-       the intermediate data structure for the Digest To Disclosed Claim
-       Map could be: { &(digested-salted-disclosed-claim) => salted }
-
-       a.  The Verifier constructs an empty cbor map called the
-           Validated Disclosed Claims Set, and initializes it with all
-           mandatory to disclose claims from the verified Presented
-           Disclosed Claims Set.
-
-       b.  Next, the Verifier performs a breadth first or depth first
-           traversal of the Presented Disclosed Claims Set and Validated
-           Disclosed Claims Set, using the Digest To Disclosed Claim Map
-           to insert claims into the Validated Disclosed Claims Set when
-           they appear in the Presented Disclosed Claims Set. By
-           performing these steps, the recipient can cryptographically
-           verify the integrity of the protected claims and verify they
-           have not been tampered with.
-
-       c.  If there remain unused claims in the Digest To Disclosed
-           Claim Map at the end of this procedure the SD-CWT MUST be
-           considered invalid.
+   5.  The Verifier MUST extract and decode the disclosed claims from
+       the sd_claims header parameter in the unprotected header of the
+       SD-CWT.  Each decoded disclosure is treated as if it is a claim
+       key or claim element at the location corresponding to its Blinded
+       Claim Hash in the payload.  If there are any disclosures that do
+       not have a corresponding Blinded Claim Hash, the entire SD-CWT is
+       invalid.  If any decoded Redacted Claim Key duplicates another
+       claim key in the same position, the entire SD-CWT is invalid.
 
           Note: A Verifier MUST be prepared to process disclosures in
           any order.  When disclosures are nested, a disclosed value
@@ -1058,6 +1324,10 @@ Issuer                           Holder                         Verifier
        Disclosed Claims Set, just as it might be applied to a validated
        CWT Claims Set.
 
+   By performing these steps, the recipient can cryptographically verify
+   the integrity of the protected claims and verify they have not been
+   tampered with.
+
 10.  Decoy Digests
 
    *TODO*
@@ -1068,6 +1338,13 @@ Issuer                           Holder                         Verifier
    split into separate entities, with an initial verifier called an
    Attester, and a target entity called a Relying Party.  Other
    protocols have a similar type of internal structure for the Verifier.
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 24]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    In some of these use cases, there is existing usage of AES-128 GCM
    and other Authenticated Encryption with Additional Data (AEAD)
@@ -1099,7 +1376,8 @@ Issuer                           Holder                         Verifier
    an Authenticated Encryption with Additional Data (AEAD) algorithm
    [RFC5116] registered in the IANA AEAD Algorithms registry
    (https://www.iana.org/assignments/aead-parameters/aead-
-   parameters.xhtml) . The second header parameter
+   parameters.xhtml) . (Guidance on specific algorithms is discussed in
+   Section 16.8.)  The second header parameter
    (sd_aead_encrypted_claims) contains a list of AEAD encrypted
    disclosures.  Taking the first example disclosure from above:
 
@@ -1116,6 +1394,14 @@ Issuer                           Holder                         Verifier
    consists of its encryption algorithm's ciphertext and its
    authentication tag.  (For example, in AEAD_AES_128_GCM the
    authentication tag is 16 octets.)  The nonce (nonce), the encryption
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 25]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    algorithm's ciphertext (ciphertext) and authentication tag (tag) are
    put in an array.  The resulting array is placed in the
    sd_aead_encrypted_claims header parameter in the unprotected headers
@@ -1159,6 +1445,18 @@ Issuer                           Holder                         Verifier
       contains only AEAD algorithms, an attacker cannot replace the
       algorithm or the message, without a decryption verification
       failure.
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 26]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
 12.  Credential Types
 
@@ -1208,6 +1506,14 @@ Issuer                           Holder                         Verifier
                    /value/  "ABCD-123456",
                    /claim/  501   / inspector_license_number /
                ]>>,
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 27]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
                <<[
                    /salt/   h'8de86a012b3043ae6e4457b9e1aaab80',
                    /value/  1549560720   / inspected 7-Feb-2019 /
@@ -1256,6 +1562,14 @@ Issuer                           Holder                         Verifier
                      b78e3ab768ce941863dc8914e8f5815f'
              ]
            },
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 28]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
            / redacted_claim_keys / simple(59) : [
                / redacted inspector_license_number /
                h'af375dc3fba1d082448642c00be7b2f7
@@ -1292,6 +1606,25 @@ Issuer                           Holder                         Verifier
    payload contains an inspection history log with the following
    structure.  It could be blinded at multiple levels of the claims set
    hierarchy.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 29]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    {
        / iss / 1  : "https://issuer.example",
@@ -1333,6 +1666,21 @@ Issuer                           Holder                         Verifier
            },
        ]
    }
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 30]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    For example, looking at the nested disclosures below, the first
    disclosure unblinds the entire January 2023 inspection record.
@@ -1382,6 +1730,14 @@ Issuer                           Holder                         Verifier
                             c891cbc3329b7fea70a3aa636c87a0a4'
                         ]
                     },
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 31]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
            /claim/  503   / San Francisco location /
        ]>>,
        <<[
@@ -1425,6 +1781,18 @@ Issuer                           Holder                         Verifier
    After applying the disclosures of the nested structure above, the
    disclosed Claims Set visible to the Verifier would look like the
    following:
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 32]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    {
        / iss / 1  : "https://issuer.example",
@@ -1470,6 +1838,18 @@ Issuer                           Holder                         Verifier
    the recommendations from [RFC6973].  Many of the topics discussed in
    [RFC6973] apply to SD-CWT, but are not repeated here.
 
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 33]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
 15.1.  Correlation
 
    Presentations of the same SD-CWT to multiple Verifiers can be
@@ -1510,6 +1890,21 @@ Issuer                           Holder                         Verifier
    characteristics and intended use cases.  The mandatory and optional-
    to-disclose data elements in an SD-CWT must be carefully chosen based
    on the specific privacy risks associated with each credential type.
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 34]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    For example, a passport credential contains highly sensitive personal
    information where even partial disclosure can have significant
@@ -1559,6 +1954,14 @@ Issuer                           Holder                         Verifier
    targeting the provisioning and binding between issuer names and their
    cryptographic key material pose significant risks.  An attacker who
    can manipulate these bindings could substitute their own keys for
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 35]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    legitimate issuer keys, enabling credential forgery while appearing
    to be a trusted issuer.
 
@@ -1603,6 +2006,17 @@ Issuer                           Holder                         Verifier
    Without proper safeguards (such as Verifier trust lists), Holders
    remain vulnerable to over-identification and long-term misuse of
    their disclosed information.
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 36]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
 16.3.  Threat Model Development Guidance
 
@@ -1652,6 +2066,14 @@ Issuer                           Holder                         Verifier
        b.  How can the Holder be convinced the Verifier that received
            presentations is legitimate?
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 37]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
        c.  How can the Holder be convinced the Verifier will not share,
            sell, leak, or otherwise disclose the Holder's presentations
            or Issuer or Holder signed material?
@@ -1699,6 +2121,15 @@ Issuer                           Holder                         Verifier
    Poor choice of salts can lead to brute force attacks that can reveal
    redacted claims.
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 38]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
 16.5.  Binding the KBT and the CWT
 
    The "iss" claim in the SD-CWT is self-asserted by the Issuer.
@@ -1744,6 +2175,36 @@ Issuer                           Holder                         Verifier
    However, the order can affect the runtime of the verification
    process.
 
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 39]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+16.8.  Choice of AEAD algorithms
+
+   The AEAD encrypted disclosures mechanism discussed in Section 11.1
+   can refer to any AEAD alogithm in the IANA AEAD Algorithms registry
+   (https://www.iana.org/assignments/aead-parameters/aead-
+   parameters.xhtml) .
+
+   When choosing an AEAD algorithm, the tag length is critical for the
+   integrity of encrypted disclosures in SD-CWT.  As such,
+   implementations MUST NOT use any AEAD algorithm with a tag length
+   less than 16 octets.
+
+   Algorithms using AES-CCM are NOT RECOMMENDED.
+
+   As of this writing, implementations MUST NOT use algorithms 3 through
+   14, 18, 19, 21, 22, 24, 25, 27, or 28.  Implementations using the
+   AEGIS algorithms containing an X MUST only use the 256-bit tag
+   variant.
+
 17.  IANA Considerations
 
 17.1.  COSE Header Parameters
@@ -1770,6 +2231,16 @@ Issuer                           Holder                         Verifier
       sender.
 
    *  Reference: Section 4 of this specification
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 40]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
 17.1.2.  sd_alg
 
@@ -1820,6 +2291,13 @@ Issuer                           Holder                         Verifier
 
    *  Value Registry: IANA AEAD Algorithm number
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 41]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  Description: The AEAD algorithm used for encrypting disclosures.
 
    *  Reference: Section 11.1 of this specification
@@ -1869,6 +2347,13 @@ Issuer                           Holder                         Verifier
 
    *  Semantics: A selective disclosure redacted (array) claim element.
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 42]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  Specification Document(s): Section 6.1 of this specification
 
 17.4.  CBOR Web Token (CWT) Claims
@@ -1916,6 +2401,15 @@ Issuer                           Holder                         Verifier
 
    *  Encoding considerations: binary
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 43]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  Security considerations: Section 16 of this specification and
       [RFC8392]
 
@@ -1962,6 +2456,15 @@ Issuer                           Holder                         Verifier
    *  Optional parameters: n/a
 
    *  Encoding considerations: binary
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 44]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    *  Security considerations: Section 16 of this specification and
       [RFC8392]
@@ -2011,6 +2514,14 @@ Issuer                           Holder                         Verifier
 
    *  Encoding considerations: binary
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 45]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  Interoperability considerations: n/a
 
    *  Fragment identifier considerations: n/a
@@ -2058,6 +2569,15 @@ Issuer                           Holder                         Verifier
    The registration procedures for numbers in specific ranges are as
    described below:
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 46]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
           +=============+=======================================+
           | Range       | Registration Procedure                |
           +=============+=======================================+
@@ -2100,6 +2620,19 @@ Issuer                           Holder                         Verifier
    IANA must only accept registry updates from the Designated Experts
    and should direct all requests for registration in the Specification
    Required range to the review mailing list.
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 47]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    It is suggested that multiple Designated Experts be appointed who are
    able to represent the perspectives of different applications using
@@ -2148,12 +2681,21 @@ Issuer                           Holder                         Verifier
               RFC 7942, DOI 10.17487/RFC7942, July 2016,
               <https://www.rfc-editor.org/info/rfc7942>.
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 48]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    [I-D.ietf-cbor-edn-literals]
               Bormann, C., "CBOR Extended Diagnostic Notation (EDN)",
               Work in Progress, Internet-Draft, draft-ietf-cbor-edn-
-              literals-18, 7 July 2025,
+              literals-19, 16 October 2025,
               <https://datatracker.ietf.org/doc/html/draft-ietf-cbor-
-              edn-literals-18>.
+              edn-literals-19>.
 
    [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
               Requirement Levels", BCP 14, RFC 2119,
@@ -2195,6 +2737,15 @@ Issuer                           Holder                         Verifier
               DOI 10.17487/RFC9052, August 2022,
               <https://www.rfc-editor.org/rfc/rfc9052>.
 
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 49]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    [RFC9053]  Schaad, J., "CBOR Object Signing and Encryption (COSE):
               Initial Algorithms", RFC 9053, DOI 10.17487/RFC9053,
               August 2022, <https://www.rfc-editor.org/rfc/rfc9053>.
@@ -2218,16 +2769,16 @@ Issuer                           Holder                         Verifier
 
    [I-D.draft-ietf-cbor-cde]
               Bormann, C., "CBOR Common Deterministic Encoding (CDE)",
-              Work in Progress, Internet-Draft, draft-ietf-cbor-cde-12,
-              7 July 2025, <https://datatracker.ietf.org/doc/html/draft-
-              ietf-cbor-cde-12>.
+              Work in Progress, Internet-Draft, draft-ietf-cbor-cde-13,
+              13 October 2025, <https://datatracker.ietf.org/doc/html/
+              draft-ietf-cbor-cde-13>.
 
    [I-D.draft-ietf-keytrans-protocol]
               McMillion, B. and F. Linker, "Key Transparency Protocol",
               Work in Progress, Internet-Draft, draft-ietf-keytrans-
-              protocol-02, 6 July 2025,
+              protocol-03, 19 October 2025,
               <https://datatracker.ietf.org/doc/html/draft-ietf-
-              keytrans-protocol-02>.
+              keytrans-protocol-03>.
 
    [I-D.draft-ietf-oauth-sd-jwt-vc]
               Terbu, O., Fett, D., and B. Campbell, "SD-JWT-based
@@ -2242,6 +2793,14 @@ Issuer                           Holder                         Verifier
               Draft, draft-ietf-oauth-selective-disclosure-jwt-22, 29
               May 2025, <https://datatracker.ietf.org/doc/html/draft-
               ietf-oauth-selective-disclosure-jwt-22>.
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 50]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    [I-D.ietf-httpbis-unprompted-auth]
               Schinazi, D., Oliver, D., and J. Hoyland, "The Concealed
@@ -2290,6 +2849,14 @@ Appendix A.  Complete CDDL Schema
       payload: bstr .cbor sd-payload,
       signature: bstr
    ])
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 51]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    kbt-cwt = #6.18([
       protected: bstr .cbor kbt-protected,
@@ -2340,6 +2907,13 @@ Appendix A.  Complete CDDL Schema
        * key => any
    }
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 52]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    kbt-payload = {
          &(aud: 3) ^ => tstr, ; "https://verifier.example/app"
        ? &(exp: 4) ^ => num,  ; 1883000000
@@ -2388,6 +2962,14 @@ Appendix A.  Complete CDDL Schema
    ; REDACTED_KEYS is to be used in CDDL payloads that are meant to
    ; convey that a map key is redacted.
    REDACTED_KEYS = #7.59  ; #7.<TBD4>
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 53]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    ;TBD4 = 59          ; for CBOR simple value 59
 
    ; redacted_claim_element is to be used in CDDL payloads that contain
@@ -2429,6 +3011,20 @@ B.3.  Issuance
 
    The issuance process for SD-CWT is similar to SD-JWT, with the
    exception that a confirmation claim is REQUIRED.
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 54]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
 B.4.  Presentation
 
@@ -2476,6 +3072,15 @@ C.1.  Subject / Holder
    }
 
    The same map in CBOR pretty printing
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 55]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    A4                                      # map(4)
       01                                   # unsigned(1)
@@ -2526,6 +3131,13 @@ C.1.  Subject / Holder
    JLWvGMfMYa1Sei1Nx64sZ36W0MyCWXZVzpLVUD9UKT2Hh10eec5HcBlDQw==
    -----END PUBLIC KEY-----
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 56]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Holder private key in PEM format
 
    -----BEGIN PRIVATE KEY-----
@@ -2564,6 +3176,23 @@ C.2.  Issuer
    }
 
    The same map in CBOR pretty printing
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 57]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    A4                                      # map(5)
       01                                   # unsigned(1)
@@ -2611,6 +3240,15 @@ C.2.  Issuer
    GNTdtwZdlFNX45ct7navTt3HwoX7Qu_PqQDGpPhDeFA
 
    Issuer public key in PEM format
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 58]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    -----BEGIN PUBLIC KEY-----
    MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEwxeYsMeIX6NSj7+HfltMOm3GelpdxrMH
@@ -2661,6 +3299,13 @@ D.1.  Transmute Prototype
 
    Description: An open-source implementation of this specification.
 
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 59]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Maturity: Prototype
 
    Coverage: The current version ('main') implements functionality
@@ -2698,17 +3343,360 @@ D.2.  Rust Prototype
 
    Contact: Beltram Maldant (beltram.ietf.spice@pm.me)
 
-Appendix E.  Document History
+Appendix E.  Relationship between RATS Architecture and Verifiable
+             Credentials
+
+   This appendix describes the relationship between the Remote
+   ATtestation procedureS (RATS) architecture defined in [RFC9334] and
+   the three-party model used in verifiable credentials.
+
+E.1.  Three-Party Verifiable Credentials Model
+
+   The verifiable credentials model involves three distinct parties:
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 60]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   *  *Issuer*: Creates and signs credentials containing claims about a
+      subject
+
+   *  *Holder*: Controls the credential and presents it to verifiers
+      (the holder is typically the subject of the credential)
+
+   *  *Verifier*: Receives and validates presented credentials to make
+      authorization or access decisions.  In this appendix we refer to
+      this role as a *Credential Verifier*
+
+   In SD-CWT, these roles are explicitly represented: the Issuer signs
+   claims using an Assertion Key (Section 2), the Holder controls the
+   credential and creates presentations using a Confirmation Key, and
+   the Verifier validates both the Issuer's signature over the
+   credential and the Holder's signature over the presentation (key
+   binding token).
+
+E.2.  RATS Architecture Roles
+
+   The RATS architecture defines the following key roles:
+
+   *  *Attester*: Produces Evidence about its own trustworthiness and
+      operational state
+
+   *  *Endorser*: Provides Endorsements about an Attester (typically a
+      manufacturer)
+
+   *  *Reference Value Provider*: Supplies Reference Values used by
+      Verifiers to evaluate Evidence
+
+   *  *Verifier*: Appraises Evidence and produces Attestation Results.
+      In this appendix we refer to this role as a *RATS Verifier*
+
+   *  *Relying Party*: Consumes Attestation Results to make
+      authorization decisions
+
+E.3.  Role Mappings in the Three-Party Model
+
+   The mapping between RATS roles and verifiable credential roles can be
+   understood as follows:
+
+E.3.1.  Verifiable Credential Issuer as RATS Endorser
+
+   A verifiable credential Issuer functions as a RATS Endorser.  The
+   Endorser role in RATS produces Endorsements - secure statements about
+   an Attester's capabilities, identity, or trustworthiness.  Similarly,
+   a credential Issuer produces signed credentials containing claims
+   about a subject (the Holder).  Both roles:
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 61]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   *  Make authoritative statements about another party's attributes or
+      capabilities
+
+   *  Use cryptographic signatures to ensure integrity and authenticity
+
+   *  Are typically trusted third parties in their respective ecosystems
+
+   *  Provide information that enables downstream authorization
+      decisions
+
+   The credential issued by the Issuer serves the same function as an
+   Endorsement in RATS: it is a signed assertion about the Holder's
+   attributes that can be used by Credential Verifiers to make trust
+   decisions.
+
+E.3.2.  Verifiable Credential Holder as RATS Verifier
+
+   A verifiable credential Holder functions as a RATS Verifier.  The
+   RATS Verifier appraises Evidence and Endorsements and produces
+   Attestation Results.  In the credentials model, the Holder:
+
+   *  Receives credentials (analogous to Endorsements) from Issuers
+
+   *  Evaluates which credentials to present and which claims to
+      disclose
+
+   *  Produces presentations (analogous to Attestation Results) that are
+      sent to Credential Verifiers
+
+   *  Uses their Confirmation Key to create key binding tokens that
+      prove control
+
+   The Holder's presentation, which includes the Issuer's credential
+   plus the Holder's signature over selected disclosures, functions as
+   an Attestation Result - a processed, signed assertion derived from
+   the original credential (Endorsement).
+
+E.3.3.  Verifiable Credential Verifier as RATS Relying Party
+
+   A verifiable credential Credential Verifier functions as a RATS
+   Relying Party.  The Relying Party:
+
+   *  Consumes Attestation Results (credential presentations) to make
+      authorization decisions
+
+   *  Validates the cryptographic integrity of received assertions
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 62]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   *  Makes access control or authorization decisions based on the
+      claims received
+
+   *  Does not directly interact with the original Endorsement source
+      (the Issuer)
+
+   The Credential Verifier appraises the Holder's presentation in the
+   same way a Relying Party appraises Attestation Results from a RATS
+   Verifier.
+
+E.3.4.  All Parties Can Be Attesters
+
+   Importantly, any of these parties - Issuer, Holder, or Credential
+   Verifier - can simultaneously function as a RATS Attester.  The
+   Attester role in RATS is about producing Evidence about one's own
+   trustworthiness:
+
+   *  An *Issuer* may be an Attester when it needs to prove its own
+      integrity, platform state, or authorization to issue certain
+      credential types.  For example, an Issuer might provide Evidence
+      about its secure enclave or certified infrastructure when
+      establishing trust with Holders or during credential issuance.
+
+   *  A *Holder* may be an Attester when presenting credentials,
+      particularly when the presentation itself requires proof of the
+      Holder's platform integrity.  For example, a Holder might provide
+      Evidence about their device's secure boot state, firmware version,
+      or trusted execution environment alongside their credential
+      presentation.
+
+   *  A *Credential Verifier* may be an Attester when it needs to prove
+      its own trustworthiness to Holders or to upstream systems.  For
+      example, a Credential Verifier might provide Evidence about its
+      data protection capabilities, compliance certifications, or secure
+      processing environment before Holders agree to disclose sensitive
+      claims.
+
+   The Attester role is orthogonal to the three primary roles - it
+   represents the ability to produce evidence about one's own state,
+   while the Issuer/Holder/Credential Verifier roles represent the flow
+   of credentials and claims about subjects.
+
+E.4.  Comparison with RATS Interaction Models
+
+   RATS defines two interaction models:
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 63]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   *Passport Model*: The Attester sends Evidence to a RATS Verifier,
+   receives Attestation Results, and presents these results to Relying
+   Parties.  This maps to the three-party credentials model where the
+   Holder obtains credentials from Issuers and presents them to
+   Credential Verifiers.
+
+   *Background-Check Model*: The Attester sends Evidence to a Relying
+   Party, which forwards it to a RATS Verifier.  The RATS Verifier
+   returns results directly to the Relying Party.  This is a two-party
+   model from the Attester's perspective and does not map well to the
+   three-party credentials model, as it lacks Holder mediation and
+   control over presentations.
+
+E.5.  Roles That Don't Map to the Three-Party Model
+
+   The *Reference Value Provider* role from RATS does not have a direct
+   equivalent in the three-party verifiable credentials model.  This
+   role supplies reference values (known-good measurements or
+   configurations) that RATS Verifiers use to appraise Endorsements and
+   Evidence.  In credentials systems, equivalent functionality might be
+   provided through:
+
+   *  Trust registries that list authorized Issuers
+
+   *  Schema registries, or lists of valid claims that define credential
+      formats
+
+   *  Governance frameworks that specify validation rules
+
+   *  Revocation registries
+
+   However, these are typically considered part of the trust
+   infrastructure rather than a distinct party in the presentation
+   protocol.  The Reference Value Provider role is primarily relevant in
+   scenarios where raw Evidence must be evaluated against known-good
+   values - a pattern more common in the two-party background-check
+   model than in the three-party credentials model where Issuers have
+   already performed evaluation and produced credentials.
+
+E.6.  Application to SD-CWT
+
+   When applying RATS concepts to SD-CWT:
+
+   *  SD-CWT credentials function as Endorsements about the Holder
+      (subject)
+
+   *  The Holder's key binding token and selective disclosure act as the
+      RATS Verifier's appraisal and production of Attestation Results
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 64]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   *  The Credential Verifier consumes these presentations as a Relying
+      Party consumes Attestation Results
+
+   *  Any party can additionally provide Evidence about their own
+      platform or operational state (act as an Attester)
+
+   *  The three-party model with selective disclosure maps naturally to
+      the RATS passport model
+
+   *  Reference Value Provider functionality is addressed through trust
+      infrastructure and out-of-band mechanisms rather than protocol-
+      level roles
+
+Appendix F.  Sample Disclosure Matching Algorithm for Verifier
+
+   The Verifier of an SD-CWT needs to decode disclosed claims match them
+   with their redacted versions.  The following example algorithm
+   describes a way to accomplish this.
+
+   1.  The decoded sd_claims are converted to an intermediate data
+       structure called a Digest To Disclosed Claim Map that is used to
+       transform the Presented Disclosed Claims Set into a Validated
+       Disclosed Claims Set.
+
+   2.  The Verifier MUST compute the hash of each Salted Disclosed Claim
+       (salted), in order to match each disclosed value to each entry of
+       the Presented Disclosed Claims Set.
+
+      One possible concrete representation of the intermediate data
+      structure for the Digest To Disclosed Claim Map is a CBOR map with
+      the hash of the bstr-encoded-salted data structure (from the CDDL)
+      as the map key and its value as the contents of the corresponding
+      salted-entry data structure.
+
+   3.  The Verifier constructs an empty CBOR map called the Validated
+       Disclosed Claims Set, and initializes it with all mandatory to
+       disclose claims from the verified Presented Disclosed Claims Set.
+
+   4.  Next, the Verifier performs a depth-first traversal of the
+       Presented Disclosed Claims Set and Validated Disclosed Claims
+       Set, using the Digest To Disclosed Claim Map to insert claims
+       into the Validated Disclosed Claims Set when they appear in the
+       Presented Disclosed Claims Set.
+
+   5.  The Verifier repeats the fourth step if the previous iteration
+       resulted in any new Presented Disclosed Claims.
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 65]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
+   6.  If there remain unused claims in the Digest To Disclosed Claim
+       Map at the end of this procedure the SD-CWT MUST be considered
+       invalid.  Likewise, if this algorithm results in any duplicate
+       CBOR map keys, the entire SD-CWT MUST be considered invalid.
+
+      Note: If there are remaining digests without corresponding
+      disclosures, this means that either the holder intentionally did
+      not disclose a claim, or that the digest is a decoy digest
+      Section 10.
+
+Appendix G.  Document History
 
    Note: RFC Editor, please remove this entire section on publication.
 
-E.1.  draft-ietf-spice-sd-cwt-04
+G.1.  draft-ietf-spice-sd-cwt-05
+
+   *  Added this change log (PR#150)
+
+   *  Moved non-normative validation algorithm to an appendix (PR#149)
+
+   *  Added appendix describing mapping to RATS concepts (#147)
+
+   *  Provided guidance on choice of AEAD algorithm (#148)
+
+   *  Fixed algorithm in COSE key examples (#145)
+
+   *  Updated contact information (PR#142, PR #150)
+
+   *  Removed SPICE from the title of the document (PR#139)
+
+   *  Made clear extent to which verifiers cannot process unknown claims
+      (PR#138)
+
+   *  Sorted CBOR map keys in examples to facilitate use as test vectors
+      (PR#135)
+
+   *  Consistently use term "tag" in context of AEAD algorithms (PR#134)
+
+   *  Improved AASVG diagram in Terminology section (PR#129)
+
+G.2.  draft-ietf-spice-sd-cwt-04
 
    *  Place value before claim name in disclosures
 
    *  Use CBOR simple value 59 for the redacted_key_claims
 
    *  Greatly improved text around AEAD encrypted disclosures
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 66]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    *  Applied clarifications and corrections suggested by Mike Jones.
 
@@ -2743,7 +3731,7 @@ E.1.  draft-ietf-spice-sd-cwt-04
 
    *  Fixed some references
 
-E.2.  draft-ietf-spice-sd-cwt-03
+G.3.  draft-ietf-spice-sd-cwt-03
 
    *  remove bstr encoding from sd_claims array (but not the individual
       disclosures)
@@ -2756,6 +3744,15 @@ E.2.  draft-ietf-spice-sd-cwt-03
 
    *  clarify that duplicate map keys are not allowed, and how tagged
       keys are represented.
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 67]
+
+Internet-Draft                   SD-CWT                     October 2025
+
 
    *  added security considerations section (#42) and text about privacy
       and linkability risks (#43)
@@ -2775,7 +3772,7 @@ E.2.  draft-ietf-spice-sd-cwt-03
 
    *  add optional encrypted disclosures
 
-E.3.  draft-ietf-spice-sd-cwt-02
+G.4.  draft-ietf-spice-sd-cwt-02
 
    *  KBT now includes the entire SD-CWT in the Confirmation Key CWT
       (kcwt) existing COSE protected header.  Has algorithm now
@@ -2789,7 +3786,7 @@ E.3.  draft-ietf-spice-sd-cwt-02
 
    *  Add section saying SD-CWT updates the CWT spec (RFC8392).  (PR#29)
 
-E.4.  draft-ietf-spice-sd-cwt-01
+G.5.  draft-ietf-spice-sd-cwt-01
 
    *  Added Overview section
 
@@ -2805,6 +3802,14 @@ E.4.  draft-ietf-spice-sd-cwt-01
    *  Consistently avoid use of bare term "key" - to make crypto keys
       and map keys clear
 
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 68]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    *  Make clear issued SD-CWT can contain zero or more redactions;
       presented SD-CWT can disclose zero, some, or all redacted claims.
 
@@ -2818,7 +3823,7 @@ E.4.  draft-ietf-spice-sd-cwt-01
 
    *  Updated draft metadata
 
-E.5.  draft-ietf-spice-sd-cwt-00
+G.6.  draft-ietf-spice-sd-cwt-00
 
    *  Initial working group version based on draft-prorock-spice-cose-
       sd-cwt-01.
@@ -2855,6 +3860,12 @@ Authors' Addresses
    Email: orie@or13.io
 
 
+
+Prorock, et al.           Expires 23 April 2026                [Page 69]
+
+Internet-Draft                   SD-CWT                     October 2025
+
+
    Henk Birkholz
    Fraunhofer SIT
    Rheinstrasse 75
@@ -2864,5 +3875,46 @@ Authors' Addresses
 
 
    Rohan Mahy
-   Rohan Mahy Consulting Services
    Email: rohan.ietf@gmail.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Prorock, et al.           Expires 23 April 2026                [Page 70]
