@@ -57,7 +57,7 @@ def create_sd_kbt(
     audience: str,
     issued_at: int,
     cnonce: Optional[bytes] = None,
-    key_id: Optional[bytes] = None
+    key_id: Optional[bytes] = None,
 ) -> bytes:
     """Create an SD-CWT Key Binding Token (SD-KBT).
 
@@ -77,8 +77,8 @@ def create_sd_kbt(
     """
     # SD-KBT payload (CWT Claims Set)
     kbt_payload = {
-        3: audience,    # aud - REQUIRED: corresponds to the Verifier
-        6: issued_at,   # iat - REQUIRED: issued at time
+        3: audience,  # aud - REQUIRED: corresponds to the Verifier
+        6: issued_at,  # iat - REQUIRED: issued at time
     }
 
     # Add optional cnonce if provided
@@ -88,7 +88,7 @@ def create_sd_kbt(
     # Protected header for SD-KBT
     protected_header = {
         1: holder_signer.algorithm,  # Algorithm
-        16: "application/kb+cwt",    # typ header parameter (REQUIRED)
+        16: "application/kb+cwt",  # typ header parameter (REQUIRED)
         TBD_KCWT: sd_cwt_with_disclosures,  # kcwt - contains the full SD-CWT
     }
 
@@ -107,7 +107,7 @@ def create_sd_kbt(
         payload_bytes,
         holder_signer,
         protected_header=protected_header,
-        unprotected_header=unprotected_header
+        unprotected_header=unprotected_header,
     )
 
     return sd_kbt
@@ -117,7 +117,7 @@ def create_sd_cwt_with_mandatory_cnf(
     base_claims: dict[Any, Any],
     holder_key: bytes,
     sd_hashes: list[bytes],
-    use_thumbprint: bool = False
+    use_thumbprint: bool = False,
 ) -> dict[Any, Any]:
     """Create SD-CWT claims with mandatory cnf claim.
 

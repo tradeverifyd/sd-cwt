@@ -63,9 +63,15 @@ class TestSpecificationPrivateKeys:
         assert len(key[-4]) == 32, "Private key should be 32 bytes"
 
         # Verify exact values from specification
-        expected_x = bytes.fromhex('8554eb275dcd6fbd1c7ac641aa2c90d92022fd0d3024b5af18c7cc61ad527a2d')
-        expected_y = bytes.fromhex('4dc7ae2c677e96d0cc82597655ce92d5503f54293d87875d1e79ce4770194343')
-        expected_d = bytes.fromhex('5759a86e59bb3b002dde467da4b52f3d06e6c2cd439456cf0485b9b864294ce5')
+        expected_x = bytes.fromhex(
+            "8554eb275dcd6fbd1c7ac641aa2c90d92022fd0d3024b5af18c7cc61ad527a2d"
+        )
+        expected_y = bytes.fromhex(
+            "4dc7ae2c677e96d0cc82597655ce92d5503f54293d87875d1e79ce4770194343"
+        )
+        expected_d = bytes.fromhex(
+            "5759a86e59bb3b002dde467da4b52f3d06e6c2cd439456cf0485b9b864294ce5"
+        )
 
         assert key[-2] == expected_x, "X coordinate should match specification"
         assert key[-3] == expected_y, "Y coordinate should match specification"
@@ -94,9 +100,15 @@ class TestSpecificationPrivateKeys:
         assert len(key[-4]) == 48, "Private key should be 48 bytes"
 
         # Verify exact values from specification
-        expected_x = bytes.fromhex('c31798b0c7885fa3528fbf877e5b4c3a6dc67a5a5dc6b307b728c3725926f2abe5fb4964cd91e3948a5493f6ebb6cbbf')
-        expected_y = bytes.fromhex('8f6c7ec761691cad374c4daa9387453f18058ece58eb0a8e84a055a31fb7f9214b27509522c159e764f8711e11609554')
-        expected_d = bytes.fromhex('71c54d2221937ea612db1221f0d3ddf771c9381c4e3be41d5aa0a89d685f09cfef74c4bbf104783fd57e87ab227d074c')
+        expected_x = bytes.fromhex(
+            "c31798b0c7885fa3528fbf877e5b4c3a6dc67a5a5dc6b307b728c3725926f2abe5fb4964cd91e3948a5493f6ebb6cbbf"
+        )
+        expected_y = bytes.fromhex(
+            "8f6c7ec761691cad374c4daa9387453f18058ece58eb0a8e84a055a31fb7f9214b27509522c159e764f8711e11609554"
+        )
+        expected_d = bytes.fromhex(
+            "71c54d2221937ea612db1221f0d3ddf771c9381c4e3be41d5aa0a89d685f09cfef74c4bbf104783fd57e87ab227d074c"
+        )
 
         assert key[-2] == expected_x, "X coordinate should match specification"
         assert key[-3] == expected_y, "Y coordinate should match specification"
@@ -120,7 +132,7 @@ class TestSpecificationPrivateKeys:
         # Test hex representation for interoperability
         hex_cbor = cbor_data.hex()
         assert isinstance(hex_cbor, str)
-        assert all(c in '0123456789abcdef' for c in hex_cbor.lower())
+        assert all(c in "0123456789abcdef" for c in hex_cbor.lower())
 
     def test_convert_issuer_key_to_cbor(self, issuer_private_key_edn):
         """Test converting issuer key to CBOR format."""
@@ -230,7 +242,9 @@ class TestSpecificationPrivateKeys:
         holder_public = {k: v for k, v in holder_key.items() if k != -4}
 
         holder_thumbprint = CoseKeyThumbprint.compute(holder_public, "sha256")
-        expected_holder = bytes.fromhex('8343d73cdfcb81f2c7cd11a5f317be8eb34e4807ec8c9ceb282495cffdf037e0')
+        expected_holder = bytes.fromhex(
+            "8343d73cdfcb81f2c7cd11a5f317be8eb34e4807ec8c9ceb282495cffdf037e0"
+        )
         assert holder_thumbprint == expected_holder, "Holder thumbprint should match specification"
 
         # Test issuer key thumbprint
@@ -239,7 +253,9 @@ class TestSpecificationPrivateKeys:
         issuer_public = {k: v for k, v in issuer_key.items() if k != -4}
 
         issuer_thumbprint = CoseKeyThumbprint.compute(issuer_public, "sha256")
-        expected_issuer = bytes.fromhex('554550a611c9807b3462cfec4a690a1119bc43b571da1219782133f5fd6dbcb0')
+        expected_issuer = bytes.fromhex(
+            "554550a611c9807b3462cfec4a690a1119bc43b571da1219782133f5fd6dbcb0"
+        )
         assert issuer_thumbprint == expected_issuer, "Issuer thumbprint should match specification"
 
     def test_cbor_pretty_print_format(self, holder_private_key_edn):
@@ -256,13 +272,15 @@ class TestSpecificationPrivateKeys:
 
         # Should have exactly 5 fields: kty, alg, crv, x, y
         assert len(decoded) == 5
-        assert decoded[1] == 2    # kty: EC2
-        assert decoded[3] == -7   # alg: ES256 (corrected from spec's -9)
-        assert decoded[-1] == 1   # crv: P-256
+        assert decoded[1] == 2  # kty: EC2
+        assert decoded[3] == -7  # alg: ES256 (corrected from spec's -9)
+        assert decoded[-1] == 1  # crv: P-256
         assert len(decoded[-2]) == 32  # x coordinate
         assert len(decoded[-3]) == 32  # y coordinate
 
-    def test_key_compatibility_with_cryptography(self, holder_private_key_edn, issuer_private_key_edn):
+    def test_key_compatibility_with_cryptography(
+        self, holder_private_key_edn, issuer_private_key_edn
+    ):
         """Test that keys are compatible with cryptographic operations."""
         # Import both keys
         holder_cbor = edn_utils.diag_to_cbor(holder_private_key_edn)
@@ -272,18 +290,18 @@ class TestSpecificationPrivateKeys:
         issuer_key = cbor_utils.decode(issuer_cbor)
 
         # Test holder key (P-256)
-        holder_private_int = int.from_bytes(holder_key[-4], 'big')
+        holder_private_int = int.from_bytes(holder_key[-4], "big")
         assert 0 < holder_private_int < 2**256, "Holder private key should be in valid range"
 
         # Test issuer key (P-384)
-        issuer_private_int = int.from_bytes(issuer_key[-4], 'big')
+        issuer_private_int = int.from_bytes(issuer_key[-4], "big")
         assert 0 < issuer_private_int < 2**384, "Issuer private key should be in valid range"
 
         # Verify coordinates are not zero
-        assert holder_key[-2] != b'\x00' * 32, "Holder X coordinate should not be zero"
-        assert holder_key[-3] != b'\x00' * 32, "Holder Y coordinate should not be zero"
-        assert issuer_key[-2] != b'\x00' * 48, "Issuer X coordinate should not be zero"
-        assert issuer_key[-3] != b'\x00' * 48, "Issuer Y coordinate should not be zero"
+        assert holder_key[-2] != b"\x00" * 32, "Holder X coordinate should not be zero"
+        assert holder_key[-3] != b"\x00" * 32, "Holder Y coordinate should not be zero"
+        assert issuer_key[-2] != b"\x00" * 48, "Issuer X coordinate should not be zero"
+        assert issuer_key[-3] != b"\x00" * 48, "Issuer Y coordinate should not be zero"
 
     def test_edn_format_validation(self, holder_private_key_edn, issuer_private_key_edn):
         """Test that EDN format is valid and parseable."""
@@ -296,7 +314,9 @@ class TestSpecificationPrivateKeys:
         holder_roundtrip_cbor = edn_utils.diag_to_cbor(holder_roundtrip_edn)
         holder_roundtrip_decoded = cbor_utils.decode(holder_roundtrip_cbor)
 
-        assert holder_decoded == holder_roundtrip_decoded, "Holder EDN roundtrip should preserve key"
+        assert (
+            holder_decoded == holder_roundtrip_decoded
+        ), "Holder EDN roundtrip should preserve key"
 
         # Test issuer key EDN
         issuer_cbor = edn_utils.diag_to_cbor(issuer_private_key_edn)
@@ -307,7 +327,9 @@ class TestSpecificationPrivateKeys:
         issuer_roundtrip_cbor = edn_utils.diag_to_cbor(issuer_roundtrip_edn)
         issuer_roundtrip_decoded = cbor_utils.decode(issuer_roundtrip_cbor)
 
-        assert issuer_decoded == issuer_roundtrip_decoded, "Issuer EDN roundtrip should preserve key"
+        assert (
+            issuer_decoded == issuer_roundtrip_decoded
+        ), "Issuer EDN roundtrip should preserve key"
 
     def test_specification_algorithm_correction(self, holder_private_key_edn):
         """Test that we correctly handle the specification's algorithm error."""

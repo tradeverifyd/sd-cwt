@@ -1,6 +1,5 @@
 """Test redaction process using tags 58, 59, and 60."""
 
-
 from sd_cwt import cbor_utils
 from sd_cwt.redaction import SeededSaltGenerator, edn_to_redacted_cbor
 
@@ -11,7 +10,7 @@ class TestRedactionTags:
     def test_tag_58_to_59_and_60_transformation(self):
         """Test that tag 58 transforms to tag 59 for map keys and tag 60 for array elements."""
         # EDN with both redactable map key and redactable array element using tag 58
-        edn_with_redactables = '''
+        edn_with_redactables = """
         {
             "public_key": "visible_value",
             "private_key": 58("secret_value"),
@@ -22,7 +21,7 @@ class TestRedactionTags:
             ],
             "another_field": "also_visible"
         }
-        '''
+        """
 
         # Use seeded generator for deterministic results
         seeded_gen = SeededSaltGenerator(seed=12345)
@@ -43,10 +42,14 @@ class TestRedactionTags:
         assert len(claims["data_array"]) == 3, "Array should maintain original length"
         assert "item1" in claims["data_array"], "Non-redacted array element should remain"
         assert "item3" in claims["data_array"], "Non-redacted array element should remain"
-        assert "secret_item" not in claims["data_array"], "Original redacted value should not be present"
+        assert (
+            "secret_item" not in claims["data_array"]
+        ), "Original redacted value should not be present"
 
         # Find the tag 60 element in the array
-        tag_60_elements = [item for item in claims["data_array"] if cbor_utils.is_tag(item) and item.tag == 60]
+        tag_60_elements = [
+            item for item in claims["data_array"] if cbor_utils.is_tag(item) and item.tag == 60
+        ]
         assert len(tag_60_elements) == 1, "Should have exactly one tag 60 element in array"
         assert isinstance(tag_60_elements[0].value, bytes), "Tag 60 should wrap a hash (bytes)"
 
@@ -95,7 +98,7 @@ class TestRedactionTags:
     def test_tag_meaning_explanation(self):
         """Test that demonstrates the meaning of each tag clearly."""
         # Before redaction: both use tag 58
-        edn_before_redaction = '''
+        edn_before_redaction = """
         {
             "visible": "data",
             "to_be_redacted_key": 58("hidden_key_value"),
@@ -104,7 +107,7 @@ class TestRedactionTags:
                 58("hidden_array_value")
             ]
         }
-        '''
+        """
 
         seeded_gen = SeededSaltGenerator(seed=999)
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_before_redaction, seeded_gen)
@@ -129,16 +132,20 @@ class TestRedactionTags:
         # Verify the transformation
         assert "to_be_redacted_key" not in claims, "Map key with tag 58 should be redacted"
         assert "visible" in claims, "Non-tagged items should remain visible"
-        assert len(claims["list"]) == 2, "Array should maintain original length (visible item + tag 60 hash)"
+        assert (
+            len(claims["list"]) == 2
+        ), "Array should maintain original length (visible item + tag 60 hash)"
         assert "visible_item" in claims["list"], "Non-tagged array items should remain"
 
         # Verify the array contains a tag 60 wrapped hash
-        tag_60_in_list = [item for item in claims["list"] if cbor_utils.is_tag(item) and item.tag == 60]
+        tag_60_in_list = [
+            item for item in claims["list"] if cbor_utils.is_tag(item) and item.tag == 60
+        ]
         assert len(tag_60_in_list) == 1, "Array should contain exactly one tag 60 element"
 
     def test_multiple_redactions_with_different_types(self):
         """Test multiple redactions showing tag transformations."""
-        edn_complex = '''
+        edn_complex = """
         {
             "issuer": "https://example.com",
             "subject": "user123",
@@ -156,7 +163,7 @@ class TestRedactionTags:
                 "hidden": 58("nested_secret")
             }
         }
-        '''
+        """
 
         seeded_gen = SeededSaltGenerator(seed=777)
         cbor_claims, disclosures = edn_to_redacted_cbor(edn_complex, seeded_gen)
@@ -174,8 +181,12 @@ class TestRedactionTags:
         original_array_length = 5  # public1, secret1, public2, secret2, public3
         redacted_array_length = len(claims["mixed_array"])
         assert original_array_length == redacted_array_length, "Array length should be preserved"
-        tag_60_count = len([item for item in claims["mixed_array"] if cbor_utils.is_tag(item) and item.tag == 60])
-        print(f"  Array elements (tag 58 → tag 60): {tag_60_count} items replaced with tag 60 hashes")
+        tag_60_count = len(
+            [item for item in claims["mixed_array"] if cbor_utils.is_tag(item) and item.tag == 60]
+        )
+        print(
+            f"  Array elements (tag 58 → tag 60): {tag_60_count} items replaced with tag 60 hashes"
+        )
 
         # Only map keys get hashes in simple(59) - array elements use tag 60 in-place
         total_redacted_map_keys = 3  # secret_field1, secret_field2, nested.hidden
@@ -196,8 +207,12 @@ class TestRedactionTags:
         assert "secret_array_item2" not in claims["mixed_array"]
 
         # Count tag 60 elements in the array
-        tag_60_elements_in_mixed_array = [item for item in claims["mixed_array"] if cbor_utils.is_tag(item) and item.tag == 60]
-        assert len(tag_60_elements_in_mixed_array) == 2, "Should have exactly 2 tag 60 elements replacing redacted items"
+        tag_60_elements_in_mixed_array = [
+            item for item in claims["mixed_array"] if cbor_utils.is_tag(item) and item.tag == 60
+        ]
+        assert (
+            len(tag_60_elements_in_mixed_array) == 2
+        ), "Should have exactly 2 tag 60 elements replacing redacted items"
 
         # Verify disclosures created
         total_expected_disclosures = 5  # 3 map keys + 2 array elements
@@ -213,7 +228,7 @@ class TestRedactionTags:
         documentation = {
             58: "To-be-redacted marker (EDN input only)",
             59: "Redacted map key hashes (CBOR output, simple value)",
-            60: "Redacted array element marker (conceptual, for in-place replacement)"
+            60: "Redacted array element marker (conceptual, for in-place replacement)",
         }
 
         print("SD-CWT Redaction Tag Semantics:")
@@ -250,7 +265,9 @@ class TestRedactionTags:
         assert len(claims["arr"]) == 1, "Array should maintain length with tag 60 replacement"
 
         # Verify the array contains a tag 60 element
-        tag_60_in_arr = [item for item in claims["arr"] if cbor_utils.is_tag(item) and item.tag == 60]
+        tag_60_in_arr = [
+            item for item in claims["arr"] if cbor_utils.is_tag(item) and item.tag == 60
+        ]
         assert len(tag_60_in_arr) == 1, "Array should contain exactly one tag 60 element"
 
         assert len(disclosures) == 2, "Should have disclosures for both redacted items"

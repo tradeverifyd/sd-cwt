@@ -304,7 +304,7 @@ class TestEDNRedactionDeterministic:
         cbor_hex = cbor_bytes.hex()
 
         # Validate it's a proper hex string
-        assert all(c in '0123456789abcdef' for c in cbor_hex)
+        assert all(c in "0123456789abcdef" for c in cbor_hex)
         assert len(cbor_hex) % 2 == 0  # Even length
 
         # Should be reproducible with same seed
@@ -405,7 +405,7 @@ class TestEDNRedactionDeterministic:
             1: str,  # iss - string
             2: str,  # sub - string
             6: int,  # iat - integer
-            8: dict, # cnf - map
+            8: dict,  # cnf - map
             cbor_utils.create_simple_value(59): list,  # redacted keys array
         }
 
@@ -478,7 +478,9 @@ class TestEDNRedactionDeterministic:
         for _i, date in enumerate(inspection_dates):
             if cbor_utils.is_tag(date) and cbor_utils.get_tag_number(date) == 60:
                 hash_value = cbor_utils.get_tag_value(date)
-                formatted_dates.append(f'60(h\'{hash_value.hex()[:16]}...\')')  # Show first 16 hex chars
+                formatted_dates.append(
+                    f"60(h'{hash_value.hex()[:16]}...')"
+                )  # Show first 16 hex chars
             else:
                 formatted_dates.append(str(date))
 
@@ -486,7 +488,7 @@ class TestEDNRedactionDeterministic:
         hash_array = redacted_payload[simple_59]
         formatted_hashes = []
         for hash_bytes in hash_array:
-            formatted_hashes.append(f'h\'{hash_bytes.hex()[:16]}...\'')  # Show first 16 hex chars
+            formatted_hashes.append(f"h'{hash_bytes.hex()[:16]}...'")  # Show first 16 hex chars
 
         redacted_edn_display = f"""{{
     "iss": "https://issuer.example",
@@ -517,7 +519,9 @@ class TestEDNRedactionDeterministic:
         print("\n=== VALIDATION CHECKS ===")
 
         # Check that tag 58 map keys became simple(59) entries
-        assert simple_59 in redacted_payload, "simple(59) should contain hashes of redacted map keys"
+        assert (
+            simple_59 in redacted_payload
+        ), "simple(59) should contain hashes of redacted map keys"
         assert len(redacted_payload[simple_59]) == 2, "Should have 2 redacted map keys"
         print("✓ Tag 58 map keys -> simple(59) hash array")
 
@@ -611,17 +615,17 @@ class TestEDNRedactionDeterministic:
         print(f"Metrics array: {redacted_payload['metrics']}")
 
         # Show which items were redacted
-        metrics = redacted_payload['metrics']
+        metrics = redacted_payload["metrics"]
         metrics_display = []
         for item in metrics:
             if cbor_utils.is_tag(item) and cbor_utils.get_tag_number(item) == 60:
                 hash_val = cbor_utils.get_tag_value(item)
-                metrics_display.append(f'60(h\'{hash_val.hex()[:12]}...\')')
+                metrics_display.append(f"60(h'{hash_val.hex()[:12]}...')")
             else:
                 metrics_display.append(str(item))
 
         hash_array = redacted_payload[simple_59]
-        hash_display = [f'h\'{h.hex()[:12]}...\'' for h in hash_array]
+        hash_display = [f"h'{h.hex()[:12]}...'" for h in hash_array]
 
         print(f"Metrics with tag 60: [{', '.join(metrics_display)}]")
         print(f"Simple(59) hashes: [{', '.join(hash_display)}]")
@@ -746,9 +750,9 @@ class TestEDNRedactionDeterministic:
         cbor_bytes, disclosures = edn_to_redacted_cbor(original_edn, salt_gen)
         redacted_payload = cbor_utils.decode(cbor_bytes)
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("COMPLETE BEFORE/AFTER EDN TRANSFORMATION COMPARISON")
-        print("="*80)
+        print("=" * 80)
 
         print("\n>>> BEFORE: Original EDN with tag 58 annotations <<<")
         print(original_edn.strip())
@@ -763,7 +767,7 @@ class TestEDNRedactionDeterministic:
         for item in measurements:
             if cbor_utils.is_tag(item) and cbor_utils.get_tag_number(item) == 60:
                 hash_val = cbor_utils.get_tag_value(item)
-                measurements_formatted.append(f'60(h\'{hash_val.hex()[:8]}...\')')
+                measurements_formatted.append(f"60(h'{hash_val.hex()[:8]}...')")
             else:
                 measurements_formatted.append(str(item))
 
@@ -771,7 +775,7 @@ class TestEDNRedactionDeterministic:
         hash_array = redacted_payload[simple_59]
         formatted_hashes = []
         for hash_bytes in hash_array:
-            formatted_hashes.append(f'h\'{hash_bytes.hex()[:8]}...\'')
+            formatted_hashes.append(f"h'{hash_bytes.hex()[:8]}...'")
 
         redacted_edn_display = f"""{{
     "iss": "{redacted_payload['iss']}",
@@ -863,4 +867,3 @@ class TestEDNRedactionDeterministic:
 
         print("\n✓ Complete before/after comparison successful!")
         print("✓ Developers can see exact EDN transformation with CBOR exports")
-

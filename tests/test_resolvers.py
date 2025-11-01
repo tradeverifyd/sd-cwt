@@ -142,7 +142,6 @@ class TestResolvers:
         assert is_valid2, "Verifier2 should verify SD-CWT2"
         assert payload2[1] == "https://issuer2.example"
 
-
     def test_end_to_end_resolution_workflow(self):
         """Test complete resolution workflow from key pairs to SD-CWT verification."""
         # Step 1: Set up multiple issuer keys

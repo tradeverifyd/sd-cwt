@@ -54,6 +54,7 @@ class SeededSaltGenerator:
             seed: Integer seed for deterministic salt generation
         """
         import random
+
         self._random = random.Random(seed)
 
     def generate_salt(self, length: int = 16) -> bytes:
@@ -162,13 +163,13 @@ def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
     """
     # Claims that are mandatory to disclose (MUST NOT be redacted) per specification
     MANDATORY_TO_DISCLOSE_CLAIMS = {
-        1,   # iss - issuer
-        3,   # aud - audience
-        4,   # exp - expiration
-        5,   # nbf - not before
-        6,   # iat - issued at
-        7,   # cti - CWT ID
-        8,   # cnf - confirmation (holder binding)
+        1,  # iss - issuer
+        3,  # aud - audience
+        4,  # exp - expiration
+        5,  # nbf - not before
+        6,  # iat - issued at
+        7,  # cti - CWT ID
+        8,  # cnf - confirmation (holder binding)
         39,  # cnonce - client nonce
     }
 
@@ -212,7 +213,7 @@ def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
 def process_redactions(
     claims: dict[Any, Any],
     redacted_paths: list[tuple[list[Any], Any]],
-    salt_generator: Optional[SaltGenerator] = None
+    salt_generator: Optional[SaltGenerator] = None,
 ) -> tuple[dict[Any, Any], list[bytes], list[bytes]]:
     """Process redactions and create disclosures.
 
@@ -225,6 +226,7 @@ def process_redactions(
         Tuple of (redacted_claims, disclosures, map_key_hashes)
         map_key_hashes: Only the hashes for redacted map keys (for simple(59))
     """
+
     # Manual deep copy to handle CBOR tags
     def deep_copy_claims(obj: Any) -> Any:
         if isinstance(obj, dict):
@@ -300,10 +302,7 @@ def process_redactions(
     return redacted_claims, disclosures, map_key_hashes
 
 
-def build_sd_cwt_claims(
-    claims: dict[Any, Any],
-    map_key_hashes: list[bytes]
-) -> dict[Any, Any]:
+def build_sd_cwt_claims(claims: dict[Any, Any], map_key_hashes: list[bytes]) -> dict[Any, Any]:
     """Build SD-CWT claims with redacted map key hashes.
 
     Args:
@@ -323,8 +322,7 @@ def build_sd_cwt_claims(
 
 
 def edn_to_redacted_cbor(
-    edn_string: str,
-    salt_generator: Optional[SaltGenerator] = None
+    edn_string: str, salt_generator: Optional[SaltGenerator] = None
 ) -> tuple[bytes, list[bytes]]:
     """Convert EDN with redaction tags to redacted CBOR claims.
 

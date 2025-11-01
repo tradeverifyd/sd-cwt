@@ -21,23 +21,30 @@ class TestIETF124:
 }
         """
 
-
         cbor_data = edn_utils.diag_to_cbor(holder_key_edn)
         holder_key_dict = cbor_utils.decode(cbor_data)
         assert holder_key_dict is not None
         assert holder_key_dict[1] == 2
         assert holder_key_dict[3] == -7
         assert holder_key_dict[-1] == 1
-        expected_x = bytes.fromhex('8554eb275dcd6fbd1c7ac641aa2c90d92022fd0d3024b5af18c7cc61ad527a2d')
-        expected_y = bytes.fromhex('4dc7ae2c677e96d0cc82597655ce92d5503f54293d87875d1e79ce4770194343')
-        expected_d = bytes.fromhex('5759a86e59bb3b002dde467da4b52f3d06e6c2cd439456cf0485b9b864294ce5')
+        expected_x = bytes.fromhex(
+            "8554eb275dcd6fbd1c7ac641aa2c90d92022fd0d3024b5af18c7cc61ad527a2d"
+        )
+        expected_y = bytes.fromhex(
+            "4dc7ae2c677e96d0cc82597655ce92d5503f54293d87875d1e79ce4770194343"
+        )
+        expected_d = bytes.fromhex(
+            "5759a86e59bb3b002dde467da4b52f3d06e6c2cd439456cf0485b9b864294ce5"
+        )
         assert holder_key_dict[-2] == expected_x
         assert holder_key_dict[-3] == expected_y
         assert holder_key_dict[-4] == expected_d
 
         thumbprint = cose_key_thumbprint(cbor_data)
         assert thumbprint is not None
-        assert thumbprint == bytes.fromhex('8343d73cdfcb81f2c7cd11a5f317be8eb34e4807ec8c9ceb282495cffdf037e0')
+        assert thumbprint == bytes.fromhex(
+            "8343d73cdfcb81f2c7cd11a5f317be8eb34e4807ec8c9ceb282495cffdf037e0"
+        )
 
     def test_issuer_key_thumbprint(self):
         """Test key import and thumbprint generation for the issuer key."""
@@ -62,15 +69,24 @@ class TestIETF124:
         assert issuer_key_dict[1] == 2
         assert issuer_key_dict[3] == -51
         assert issuer_key_dict[-1] == 2
-        expected_x = bytes.fromhex('c31798b0c7885fa3528fbf877e5b4c3a6dc67a5a5dc6b307b728c3725926f2abe5fb4964cd91e3948a5493f6ebb6cbbf')
-        expected_y = bytes.fromhex('8f6c7ec761691cad374c4daa9387453f18058ece58eb0a8e84a055a31fb7f9214b27509522c159e764f8711e11609554')
-        expected_d = bytes.fromhex('71c54d2221937ea612db1221f0d3ddf771c9381c4e3be41d5aa0a89d685f09cfef74c4bbf104783fd57e87ab227d074c')
+        expected_x = bytes.fromhex(
+            "c31798b0c7885fa3528fbf877e5b4c3a6dc67a5a5dc6b307b728c3725926f2abe5fb4964cd91e3948a5493f6ebb6cbbf"
+        )
+        expected_y = bytes.fromhex(
+            "8f6c7ec761691cad374c4daa9387453f18058ece58eb0a8e84a055a31fb7f9214b27509522c159e764f8711e11609554"
+        )
+        expected_d = bytes.fromhex(
+            "71c54d2221937ea612db1221f0d3ddf771c9381c4e3be41d5aa0a89d685f09cfef74c4bbf104783fd57e87ab227d074c"
+        )
         assert issuer_key_dict[-2] == expected_x
+        assert issuer_key_dict[-3] == expected_y
+        assert issuer_key_dict[-4] == expected_d
 
         thumbprint = cose_key_thumbprint(cbor_data)
         assert thumbprint is not None
-        assert thumbprint == bytes.fromhex('554550a611c9807b3462cfec4a690a1119bc43b571da1219782133f5fd6dbcb0')
-
+        assert thumbprint == bytes.fromhex(
+            "554550a611c9807b3462cfec4a690a1119bc43b571da1219782133f5fd6dbcb0"
+        )
 
     def test_minimal_spanning_example(self):
         """Test the minimal spanning example from the specification.
@@ -286,17 +302,17 @@ class TestIETF124:
         assert holder_payload[6] == 1725244237
 
         disclosure_0 = cbor_utils.decode(disclosures[0])
-        assert disclosure_0[0] == bytes.fromhex('bae611067bb823486797da1ebbb52f83')
+        assert disclosure_0[0] == bytes.fromhex("bae611067bb823486797da1ebbb52f83")
         assert disclosure_0[1] == "ABCD-123456"
         assert disclosure_0[2] == 501
 
         disclosure_1 = cbor_utils.decode(disclosures[1])
-        assert disclosure_1[0] == bytes.fromhex('8de86a012b3043ae6e4457b9e1aaab80')
+        assert disclosure_1[0] == bytes.fromhex("8de86a012b3043ae6e4457b9e1aaab80")
         assert disclosure_1[1] == 1549560720
         assert len(disclosure_1) == 2
 
         disclosure_2 = cbor_utils.decode(disclosures[2])
-        assert disclosure_2[0] == bytes.fromhex('ec615c3035d5a4ff2f5ae29ded683c8e')
+        assert disclosure_2[0] == bytes.fromhex("ec615c3035d5a4ff2f5ae29ded683c8e")
         assert disclosure_2[1] == "ca"
         assert disclosure_2[2] == "region"
 
@@ -304,7 +320,9 @@ class TestIETF124:
         assert simple_59 in issuer_payload
         redacted_top_level = issuer_payload[simple_59]
         assert len(redacted_top_level) == 1
-        expected_inspector_hash = bytes.fromhex('af375dc3fba1d082448642c00be7b2f7bb05c9d8fb61cfc230ddfdfb4616a693')
+        expected_inspector_hash = bytes.fromhex(
+            "af375dc3fba1d082448642c00be7b2f7bb05c9d8fb61cfc230ddfdfb4616a693"
+        )
         assert redacted_top_level[0] == expected_inspector_hash
 
         assert 502 in issuer_payload
@@ -314,12 +332,16 @@ class TestIETF124:
         assert cbor_utils.is_tag(inspection_dates[0])
         assert cbor_utils.get_tag_number(inspection_dates[0]) == 60
         redacted_date_1_hash = cbor_utils.get_tag_value(inspection_dates[0])
-        assert redacted_date_1_hash == bytes.fromhex('1b7fc8ecf4b1290712497d226c04b503b4aa126c603c83b75d2679c3c613f3fd')
+        assert redacted_date_1_hash == bytes.fromhex(
+            "1b7fc8ecf4b1290712497d226c04b503b4aa126c603c83b75d2679c3c613f3fd"
+        )
 
         assert cbor_utils.is_tag(inspection_dates[1])
         assert cbor_utils.get_tag_number(inspection_dates[1]) == 60
         redacted_date_2_hash = cbor_utils.get_tag_value(inspection_dates[1])
-        assert redacted_date_2_hash == bytes.fromhex('64afccd3ad52da405329ad935de1fb36814ec48fdfd79e3a108ef858e291e146')
+        assert redacted_date_2_hash == bytes.fromhex(
+            "64afccd3ad52da405329ad935de1fb36814ec48fdfd79e3a108ef858e291e146"
+        )
 
         assert inspection_dates[2] == 1674004740
 
@@ -329,19 +351,23 @@ class TestIETF124:
         assert simple_59 in inspection_location
         redacted_location_keys = inspection_location[simple_59]
         assert len(redacted_location_keys) == 2
-        expected_region_hash = bytes.fromhex('0d4b8c6123f287a1698ff2db15764564a976fb742606e8fd00e2140656ba0df3')
-        expected_postal_hash = bytes.fromhex('c0b7747f960fc2e201c4d47c64fee141b78e3ab768ce941863dc8914e8f5815f')
+        expected_region_hash = bytes.fromhex(
+            "0d4b8c6123f287a1698ff2db15764564a976fb742606e8fd00e2140656ba0df3"
+        )
+        expected_postal_hash = bytes.fromhex(
+            "c0b7747f960fc2e201c4d47c64fee141b78e3ab768ce941863dc8914e8f5815f"
+        )
         assert redacted_location_keys[0] == expected_region_hash
         assert redacted_location_keys[1] == expected_postal_hash
 
         print("\n✓ PARTIAL DISCLOSURE VERIFIED:")
-        print(f"  • Issuer ES384 signature: VALID")
-        print(f"  • Holder ES256 signature: VALID")
+        print("  • Issuer ES384 signature: VALID")
+        print("  • Holder ES256 signature: VALID")
         print(f"  • Disclosures present: {len(disclosures)}")
         print(f"    1. inspector_license_number = {disclosure_0[1]}")
         print(f"    2. inspection_dates[0] = {disclosure_1[1]} (7-Feb-2019)")
         print(f"    3. region = {disclosure_2[1]}")
-        print(f"  • Omitted disclosures still redacted:")
+        print("  • Omitted disclosures still redacted:")
         print(f"    1. inspection_dates[1] with hash {redacted_date_2_hash.hex()[:16]}...")
         print(f"    2. postal_code with hash {expected_postal_hash.hex()[:16]}...")
-        print(f"  • Always visible claims: iss, sub, exp, nbf, iat, cnf, country=us")
+        print("  • Always visible claims: iss, sub, exp, nbf, iat, cnf, country=us")

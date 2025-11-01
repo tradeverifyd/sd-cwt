@@ -27,9 +27,7 @@ class CDDLValidator:
     def _compile_schema(self) -> None:
         """Compile the CDDL schema."""
         try:
-            self.validator = zcbor.DataTranslator.from_cddl(
-                self.schema, default_max_qty=100
-            )
+            self.validator = zcbor.DataTranslator.from_cddl(self.schema, default_max_qty=100)
         except Exception as e:
             print(f"Failed to compile CDDL schema with zcbor: {e}")
             self.validator = None
