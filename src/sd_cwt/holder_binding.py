@@ -97,7 +97,7 @@ def create_sd_kbt(
         protected_header[4] = key_id  # kid
 
     # Unprotected header (empty for SD-KBT)
-    unprotected_header: dict[str, Any] = {}
+    unprotected_header: dict[int, Any] = {}
 
     # Encode payload
     payload_bytes = cbor_utils.encode(kbt_payload)

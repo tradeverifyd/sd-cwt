@@ -69,7 +69,7 @@ def create_sd_cwt_with_holder_binding(
     )
 
     # Create protected header for issuer signature
-    protected_header = {
+    protected_header: dict[int, Any] = {
         1: issuer_signer.algorithm,  # Algorithm
     }
 
@@ -142,7 +142,7 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
     """
     from .holder_binding import validate_sd_kbt_structure
 
-    result = {
+    result: dict[str, Any] = {
         "valid": False,
         "sd_cwt": None,
         "disclosures": [],
@@ -219,7 +219,7 @@ def extract_verified_claims(sd_kbt: bytes) -> dict[str, Any]:
         - claims: Complete claims map with disclosed values (if valid)
         - errors: List of errors encountered
     """
-    result = {"valid": False, "claims": {}, "errors": []}
+    result: dict[str, Any] = {"valid": False, "claims": {}, "errors": []}
 
     # First validate the presentation
     validation_result = validate_sd_cwt_presentation(sd_kbt)

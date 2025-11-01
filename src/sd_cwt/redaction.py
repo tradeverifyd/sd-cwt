@@ -2,7 +2,7 @@
 
 import hashlib
 import secrets
-from typing import Any, Optional, Protocol
+from typing import Any, Optional, Protocol, cast
 
 from . import cbor_utils, edn_utils
 
@@ -94,7 +94,7 @@ def cbor_to_dict(cbor_bytes: bytes) -> dict[Any, Any]:
     Returns:
         Decoded dictionary
     """
-    return cbor_utils.decode(cbor_bytes)
+    return cast(dict[Any, Any], cbor_utils.decode(cbor_bytes))
 
 
 def generate_salt(length: int = 16, salt_generator: Optional[SaltGenerator] = None) -> bytes:

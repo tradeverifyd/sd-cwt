@@ -2,7 +2,7 @@
 
 import re
 import time
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from . import cbor_utils
 from .cose_sign1 import cose_sign1_sign
@@ -44,7 +44,7 @@ def create_edn_with_annotations(
     optional_claims: dict[str, Any],
     issuer: str = "https://issuer.example",
     subject: str = "https://subject.example",
-    holder_public_key: bytes = None,
+    holder_public_key: Optional[bytes] = None,
     use_holder_thumbprint: bool = False,
     issued_at: Optional[int] = None,
 ) -> str:
@@ -378,6 +378,7 @@ class SDCWTPresenter:
         ]
 
         # Re-wrap with tag if original was tagged
+        new_cose_sign1: Any
         if cbor_utils.is_tag(cose_sign1):
             new_cose_sign1 = cbor_utils.create_tag(
                 cbor_utils.get_tag_number(cose_sign1), new_cose_sign1_value
@@ -392,7 +393,7 @@ class SDCWTPresenter:
 class SDCWTVerifier:
     """Simple API for verifying SD-CWT presentations."""
 
-    def __init__(self, public_key_resolver):
+    def __init__(self, public_key_resolver: Callable[[bytes], dict[int, Any]]) -> None:
         """Initialize with a public key resolver.
 
         Args:
@@ -403,7 +404,10 @@ class SDCWTVerifier:
         self.credential_verifier = CredentialVerifier(public_key_resolver)
 
     def verify_presentation(
-        self, kbt: bytes, expected_audience: str, holder_key_resolver=None
+        self,
+        kbt: bytes,
+        expected_audience: str,
+        holder_key_resolver: Optional[Callable[[bytes], dict[int, Any]]] = None,
     ) -> tuple[bool, Optional[dict[str, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 

@@ -2,7 +2,7 @@ from . import cbor_utils
 
 """COSE Key generation and management."""
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -73,7 +73,7 @@ def cose_key_to_dict(cose_key: bytes) -> dict[int, Any]:
     Returns:
         COSE key as a dictionary
     """
-    return cbor_utils.decode(cose_key)
+    return cast(dict[int, Any], cbor_utils.decode(cose_key))
 
 
 def cose_key_get_public(cose_key: bytes) -> bytes:
