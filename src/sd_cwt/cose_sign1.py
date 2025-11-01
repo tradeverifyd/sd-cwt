@@ -243,6 +243,45 @@ class ES256Verifier:
             return False
 
 
+class ES384Verifier:
+    """ECDSA P-384 SHA-384 verifier implementation."""
+
+    def __init__(self, public_key_x: bytes, public_key_y: bytes):
+        """Initialize ES384 verifier with public key coordinates.
+
+        Args:
+            public_key_x: X coordinate of public key (48 bytes)
+            public_key_y: Y coordinate of public key (48 bytes)
+        """
+        x = int.from_bytes(public_key_x, byteorder='big')
+        y = int.from_bytes(public_key_y, byteorder='big')
+
+        public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP384R1())
+        self.public_key = public_numbers.public_key(default_backend())
+
+    def verify(self, message: bytes, signature: bytes) -> bool:
+        """Verify a signature with ES384."""
+        try:
+            if len(signature) != 96:
+                return False
+
+            r = int.from_bytes(signature[:48], byteorder='big')
+            s = int.from_bytes(signature[48:], byteorder='big')
+            signature_der = utils.encode_dss_signature(r, s)
+
+            self.public_key.verify(
+                signature_der,
+                message,
+                ec.ECDSA(hashes.SHA384())
+            )
+            return True
+
+        except InvalidSignature:
+            return False
+        except (ValueError, TypeError):
+            return False
+
+
 def generate_es256_key_pair() -> tuple[bytes, bytes, bytes]:
     """Generate an ES256 (ECDSA P-256) key pair.
 
