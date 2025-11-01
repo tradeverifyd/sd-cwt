@@ -73,7 +73,26 @@ class TestIETF124:
 
 
     def test_minimal_spanning_example(self):
-        """Test the minimal spanning example from the specification."""
+        """Test the minimal spanning example from the specification.
+
+        This test verifies PARTIAL DISCLOSURE where the holder selectively reveals
+        only some claims while keeping others redacted.
+
+        DISCLOSED (3 disclosures present):
+        1. inspector_license_number = "ABCD-123456" (top-level claim 501)
+        2. inspection_dates[0] = 1549560720 (7-Feb-2019, array element)
+        3. region = "ca" (nested in inspection_location)
+
+        OMITTED (2 disclosures not included):
+        1. inspection_dates[1] = 4-Feb-2021 (remains redacted with tag 60)
+        2. postal_code in inspection_location (remains redacted)
+
+        ALWAYS VISIBLE (never redacted):
+        - Standard claims: iss, sub, exp, nbf, iat, cnf
+        - most_recent_inspection_passed = true
+        - inspection_dates[2] = 1674004740 (2023-01-17)
+        - inspection_location.country = "us"
+        """
         holder_key_edn = """
 {
   /kty/  1 : 2,
@@ -265,3 +284,64 @@ class TestIETF124:
         assert holder_payload is not None
         assert holder_payload[3] == "https://verifier.example/app"
         assert holder_payload[6] == 1725244237
+
+        disclosure_0 = cbor_utils.decode(disclosures[0])
+        assert disclosure_0[0] == bytes.fromhex('bae611067bb823486797da1ebbb52f83')
+        assert disclosure_0[1] == "ABCD-123456"
+        assert disclosure_0[2] == 501
+
+        disclosure_1 = cbor_utils.decode(disclosures[1])
+        assert disclosure_1[0] == bytes.fromhex('8de86a012b3043ae6e4457b9e1aaab80')
+        assert disclosure_1[1] == 1549560720
+        assert len(disclosure_1) == 2
+
+        disclosure_2 = cbor_utils.decode(disclosures[2])
+        assert disclosure_2[0] == bytes.fromhex('ec615c3035d5a4ff2f5ae29ded683c8e')
+        assert disclosure_2[1] == "ca"
+        assert disclosure_2[2] == "region"
+
+        simple_59 = cbor_utils.create_simple_value(59)
+        assert simple_59 in issuer_payload
+        redacted_top_level = issuer_payload[simple_59]
+        assert len(redacted_top_level) == 1
+        expected_inspector_hash = bytes.fromhex('af375dc3fba1d082448642c00be7b2f7bb05c9d8fb61cfc230ddfdfb4616a693')
+        assert redacted_top_level[0] == expected_inspector_hash
+
+        assert 502 in issuer_payload
+        inspection_dates = issuer_payload[502]
+        assert len(inspection_dates) == 3
+
+        assert cbor_utils.is_tag(inspection_dates[0])
+        assert cbor_utils.get_tag_number(inspection_dates[0]) == 60
+        redacted_date_1_hash = cbor_utils.get_tag_value(inspection_dates[0])
+        assert redacted_date_1_hash == bytes.fromhex('1b7fc8ecf4b1290712497d226c04b503b4aa126c603c83b75d2679c3c613f3fd')
+
+        assert cbor_utils.is_tag(inspection_dates[1])
+        assert cbor_utils.get_tag_number(inspection_dates[1]) == 60
+        redacted_date_2_hash = cbor_utils.get_tag_value(inspection_dates[1])
+        assert redacted_date_2_hash == bytes.fromhex('64afccd3ad52da405329ad935de1fb36814ec48fdfd79e3a108ef858e291e146')
+
+        assert inspection_dates[2] == 1674004740
+
+        assert 503 in issuer_payload
+        inspection_location = issuer_payload[503]
+        assert inspection_location["country"] == "us"
+        assert simple_59 in inspection_location
+        redacted_location_keys = inspection_location[simple_59]
+        assert len(redacted_location_keys) == 2
+        expected_region_hash = bytes.fromhex('0d4b8c6123f287a1698ff2db15764564a976fb742606e8fd00e2140656ba0df3')
+        expected_postal_hash = bytes.fromhex('c0b7747f960fc2e201c4d47c64fee141b78e3ab768ce941863dc8914e8f5815f')
+        assert redacted_location_keys[0] == expected_region_hash
+        assert redacted_location_keys[1] == expected_postal_hash
+
+        print("\n✓ PARTIAL DISCLOSURE VERIFIED:")
+        print(f"  • Issuer ES384 signature: VALID")
+        print(f"  • Holder ES256 signature: VALID")
+        print(f"  • Disclosures present: {len(disclosures)}")
+        print(f"    1. inspector_license_number = {disclosure_0[1]}")
+        print(f"    2. inspection_dates[0] = {disclosure_1[1]} (7-Feb-2019)")
+        print(f"    3. region = {disclosure_2[1]}")
+        print(f"  • Omitted disclosures still redacted:")
+        print(f"    1. inspection_dates[1] with hash {redacted_date_2_hash.hex()[:16]}...")
+        print(f"    2. postal_code with hash {expected_postal_hash.hex()[:16]}...")
+        print(f"  • Always visible claims: iss, sub, exp, nbf, iat, cnf, country=us")
