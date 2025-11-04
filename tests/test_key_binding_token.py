@@ -413,9 +413,9 @@ class TestKeyBindingToken:
 
         # Step 6: Verify audience was correctly validated during verification
         actual_audience = kbt_payload[3]  # aud claim
-        assert actual_audience == expected_audience, (
-            f"Audience should match: expected {expected_audience}, got {actual_audience}"
-        )
+        assert (
+            actual_audience == expected_audience
+        ), f"Audience should match: expected {expected_audience}, got {actual_audience}"
 
         # Additional verification: ensure KBT contains the original SD-CWT
         is_valid, _ = validate_sd_kbt_structure(sd_kbt)
@@ -514,9 +514,9 @@ class TestKeyBindingToken:
         presentation_verifier = get_presentation_verifier(
             sd_cwt, credential_verifier, holder_resolver
         )
-        assert presentation_verifier is not None, (
-            "Should create presentation verifier for ckt-based cnf"
-        )
+        assert (
+            presentation_verifier is not None
+        ), "Should create presentation verifier for ckt-based cnf"
 
         # Step 5: Create KBT using holder's private key
         holder_signer = PresentationSigner(holder_key_dict)

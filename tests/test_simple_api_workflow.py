@@ -1,6 +1,5 @@
 """Test the simple API workflow from annotation to presentation verification."""
 
-
 from sd_cwt import (
     SDCWTIssuer,
     SDCWTPresenter,
@@ -48,14 +47,14 @@ class TestSimpleAPIWorkflow:
                 "carbon": 0.25,
                 "manganese": 1.20,
                 "phosphorus": 0.040,
-                "sulfur": 0.050
+                "sulfur": 0.050,
             },
             "production_cost": 850.75,
             "quality_test_results": {
                 "tensile_strength": 420,
                 "yield_strength": 350,
-                "elongation": 18.5
-            }
+                "elongation": 18.5,
+            },
         }
 
         print("✓ Defined mandatory and optional claims")
@@ -68,7 +67,7 @@ class TestSimpleAPIWorkflow:
             optional_claims=optional_claims,
             holder_public_key=holder_public_key_cbor,
             issuer="https://steel-manufacturer.example",
-            subject="https://customs-broker.example"
+            subject="https://customs-broker.example",
         )
 
         assert isinstance(sd_cwt, bytes), "SD-CWT should be bytes"
@@ -92,7 +91,7 @@ class TestSimpleAPIWorkflow:
             disclosures=disclosures,
             selected_disclosures=selected_disclosures,
             audience="https://customs.us.example",
-            nonce="1234567890"
+            nonce="1234567890",
         )
 
         assert isinstance(kbt, bytes), "KBT should be bytes"
@@ -111,8 +110,7 @@ class TestSimpleAPIWorkflow:
 
         # Step 6: Verify presentation
         is_valid, verified_claims, tags_absent = verifier.verify_presentation(
-            kbt=kbt,
-            expected_audience="https://customs.us.example"
+            kbt=kbt, expected_audience="https://customs.us.example"
         )
 
         assert is_valid, "Presentation should be cryptographically valid"
@@ -134,7 +132,9 @@ class TestSimpleAPIWorkflow:
         # Step 8: Check that base claims (mandatory to disclose) are present
         for claim_name in base_claims:
             assert claim_name in verified_claims, f"Base claim {claim_name} should be present"
-            assert verified_claims[claim_name] == base_claims[claim_name], f"Base claim {claim_name} should match"
+            assert (
+                verified_claims[claim_name] == base_claims[claim_name]
+            ), f"Base claim {claim_name} should match"
 
         print("✓ Base claims (mandatory to disclose) present and correct")
 
@@ -147,7 +147,9 @@ class TestSimpleAPIWorkflow:
         # Step 10: Check that non-selected optional claims are NOT present
         non_selected_claims = [claim for claim in optional_claims if claim not in selected_claims]
         for claim_name in non_selected_claims:
-            assert claim_name not in verified_claims, f"Non-selected claim {claim_name} should not be disclosed"
+            assert (
+                claim_name not in verified_claims
+            ), f"Non-selected claim {claim_name} should not be disclosed"
 
         print("✓ Non-selected optional claims are properly redacted")
 
@@ -172,7 +174,7 @@ class TestSimpleAPIWorkflow:
         edn = create_edn_with_annotations(
             base_claims=base_claims,
             optional_claims=optional_claims,
-            holder_public_key=holder_public_key_cbor
+            holder_public_key=holder_public_key_cbor,
         )
 
         assert isinstance(edn, str), "EDN should be string"
@@ -184,7 +186,7 @@ class TestSimpleAPIWorkflow:
 
     def test_presentation_edn_cleaning(self):
         """Test EDN cleaning for presentations."""
-        original_edn = '''
+        original_edn = """
 {
   1: "https://issuer.example",
   2: "https://subject.example",
@@ -194,7 +196,7 @@ class TestSimpleAPIWorkflow:
   "heat_number": 58("H240115-001"),
   "cost": 58(850.75)
 }
-        '''.strip()
+        """.strip()
 
         selected_claims = ["heat_number"]
 
@@ -202,8 +204,9 @@ class TestSimpleAPIWorkflow:
 
         assert isinstance(presentation_edn, str), "Presentation EDN should be string"
         assert '"heat_number": "H240115-001"' in presentation_edn, "Selected claims should be clean"
-        assert "58(" not in presentation_edn or presentation_edn.count("58(") < original_edn.count("58("), \
-            "Tag 58 should be removed from selected claims"
+        assert "58(" not in presentation_edn or presentation_edn.count("58(") < original_edn.count(
+            "58("
+        ), "Tag 58 should be removed from selected claims"
 
         print("✓ Presentation EDN cleaning test passed")
 
@@ -215,6 +218,7 @@ class TestSimpleAPIWorkflow:
         # Create a mock verifier to test tag detection
         def mock_resolver(kid):
             return {"mock": "key"}
+
         verifier = SDCWTVerifier(mock_resolver)
 
         # Test payload with no redaction tags (clean)
@@ -224,7 +228,7 @@ class TestSimpleAPIWorkflow:
             6: 1725244200,
             8: {"cnf": "data"},
             "production_date": "2024-01-15",
-            "heat_number": "H240115-001"
+            "heat_number": "H240115-001",
         }
 
         clean_claims, tags_absent = verifier._extract_clean_claims(clean_payload)
@@ -241,12 +245,12 @@ class TestSimpleAPIWorkflow:
 
         def mock_resolver(kid):
             return {"mock": "key"}
+
         verifier = SDCWTVerifier(mock_resolver)
 
         # Invalid KBT should return False
         is_valid, claims, tags_absent = verifier.verify_presentation(
-            kbt=b"invalid_kbt",
-            expected_audience="https://test.example"
+            kbt=b"invalid_kbt", expected_audience="https://test.example"
         )
 
         assert not is_valid, "Invalid KBT should not verify"
@@ -273,23 +277,16 @@ class TestSimpleAPIWorkflow:
         # Complex claims with nested structures
         base_claims = {
             "document_type": "steel_certificate",
-            "issuer_info": {
-                "name": "Steel Manufacturing Corp",
-                "license": "SMC-2024-001"
-            }
+            "issuer_info": {"name": "Steel Manufacturing Corp", "license": "SMC-2024-001"},
         }
 
         optional_claims = {
             "detailed_composition": {
-                "elements": {
-                    "carbon": 0.25,
-                    "manganese": 1.20,
-                    "silicon": 0.30
-                },
-                "additives": ["chromium", "nickel"]
+                "elements": {"carbon": 0.25, "manganese": 1.20, "silicon": 0.30},
+                "additives": ["chromium", "nickel"],
             },
             "test_results": [420, 350, 18.5],
-            "confidential_notes": "Internal batch notes here"
+            "confidential_notes": "Internal batch notes here",
         }
 
         # Test issuance
@@ -297,7 +294,7 @@ class TestSimpleAPIWorkflow:
         sd_cwt, edn, disclosures = issuer.issue_credential(
             base_claims=base_claims,
             optional_claims=optional_claims,
-            holder_public_key=holder_public_key_cbor
+            holder_public_key=holder_public_key_cbor,
         )
 
         # Test presentation
@@ -306,7 +303,7 @@ class TestSimpleAPIWorkflow:
             sd_cwt=sd_cwt,
             disclosures=disclosures,
             selected_disclosures=disclosures[:1],  # Select one disclosure
-            audience="https://verifier.example"
+            audience="https://verifier.example",
         )
 
         # Test verification
@@ -315,8 +312,7 @@ class TestSimpleAPIWorkflow:
         verifier = SDCWTVerifier(issuer_resolver)
 
         is_valid, claims, tags_absent = verifier.verify_presentation(
-            kbt=kbt,
-            expected_audience="https://verifier.example"
+            kbt=kbt, expected_audience="https://verifier.example"
         )
 
         assert is_valid, "Complex claims presentation should verify"

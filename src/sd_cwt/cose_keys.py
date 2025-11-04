@@ -2,7 +2,7 @@ from . import cbor_utils
 
 """COSE Key generation and management."""
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -27,22 +27,22 @@ def cose_key_generate(key_id: Optional[bytes] = None) -> bytes:
 
     # Get private key value (32 bytes for P-256)
     private_value = private_key.private_numbers().private_value
-    d = private_value.to_bytes(32, byteorder='big')
+    d = private_value.to_bytes(32, byteorder="big")
 
     # Get public key coordinates (32 bytes each for P-256)
     public_key = private_key.public_key()
     public_numbers = public_key.public_numbers()
-    x = public_numbers.x.to_bytes(32, byteorder='big')
-    y = public_numbers.y.to_bytes(32, byteorder='big')
+    x = public_numbers.x.to_bytes(32, byteorder="big")
+    y = public_numbers.y.to_bytes(32, byteorder="big")
 
     # Build COSE_Key structure for ES256/P-256
     cose_key = {
-        1: COSE_KTY_EC2,    # kty: EC2
+        1: COSE_KTY_EC2,  # kty: EC2
         3: COSE_ALG_ES256,  # alg: ES256
         -1: COSE_CRV_P256,  # crv: P-256
-        -2: x,              # x: x-coordinate
-        -3: y,              # y: y-coordinate
-        -4: d,              # d: private key
+        -2: x,  # x: x-coordinate
+        -3: y,  # y: y-coordinate
+        -4: d,  # d: private key
     }
 
     # Add key ID if provided
@@ -50,8 +50,6 @@ def cose_key_generate(key_id: Optional[bytes] = None) -> bytes:
         cose_key[2] = key_id  # kid: Key ID
 
     return cbor_utils.encode(cose_key)
-
-
 
 
 def cose_key_from_dict(key_dict: dict[int, Any]) -> bytes:
@@ -75,7 +73,7 @@ def cose_key_to_dict(cose_key: bytes) -> dict[int, Any]:
     Returns:
         COSE key as a dictionary
     """
-    return cbor_utils.decode(cose_key)
+    return cast(dict[int, Any], cbor_utils.decode(cose_key))
 
 
 def cose_key_get_public(cose_key: bytes) -> bytes:
@@ -119,10 +117,10 @@ def cose_key_thumbprint(cose_key: bytes, hash_algorithm: str = "sha-256") -> byt
 
     # For EC2 (P-256): kty, crv, x, y
     canonical = {
-        1: key_dict[1],   # kty
-        -1: key_dict[-1], # crv
-        -2: key_dict[-2], # x
-        -3: key_dict[-3], # y
+        1: key_dict[1],  # kty
+        -1: key_dict[-1],  # crv
+        -2: key_dict[-2],  # x
+        -3: key_dict[-3],  # y
     }
 
     # Encode canonically

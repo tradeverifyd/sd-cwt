@@ -83,7 +83,10 @@ select = [
     "UP",   # pyupgrade
     "SIM",  # flake8-simplify
 ]
-ignore = ["E501"]  # line too long
+ignore = [
+    "E501",  # line too long
+    "E402",  # module level import not at top of file (conflicts with module docstrings)
+]
 
 [tool.black]
 line-length = 100

@@ -19,8 +19,12 @@ class TestEDNAPIComprehensive:
         """Test complete workflow with EDN specification, deterministic salting, and validation."""
 
         # Step 1: Define static keys for reproducible testing
-        issuer_key_cbor = bytes.fromhex("a60102032620012158203884a05a20e85fc48e34b761d651a74ee8a1ba5e11d7e771f1bc611ee84d05e2225820a0ae4064b94ec449d53218086d37f436b8ef60eb1da6ad50bff700c6ecf613cd23582067b8ee92d2bcd650d6d0632534910250aaee4f192b48218077084e6a04560b62")
-        holder_key_cbor = bytes.fromhex("a601020326200121582091e48079742cce0ef9126cfdc526d395dc2136e40deb8c47638bdcf5d7eaa56422582014279156a8e5afa6524192c16660039edb12d581e0c437bf3faa66dca9a5a278235820024b0357a9a9fa0b236cc2c100a23f2bfd822cbed11ec6bbeefe874a6de324ea")
+        issuer_key_cbor = bytes.fromhex(
+            "a60102032620012158203884a05a20e85fc48e34b761d651a74ee8a1ba5e11d7e771f1bc611ee84d05e2225820a0ae4064b94ec449d53218086d37f436b8ef60eb1da6ad50bff700c6ecf613cd23582067b8ee92d2bcd650d6d0632534910250aaee4f192b48218077084e6a04560b62"
+        )
+        holder_key_cbor = bytes.fromhex(
+            "a601020326200121582091e48079742cce0ef9126cfdc526d395dc2136e40deb8c47638bdcf5d7eaa56422582014279156a8e5afa6524192c16660039edb12d581e0c437bf3faa66dca9a5a278235820024b0357a9a9fa0b236cc2c100a23f2bfd822cbed11ec6bbeefe874a6de324ea"
+        )
 
         issuer_key_dict = cbor_utils.decode(issuer_key_cbor)
         holder_key_dict = cbor_utils.decode(holder_key_cbor)
@@ -129,11 +133,16 @@ class TestEDNAPIComprehensive:
         # Validate specific disclosure values
         assert disclosure_claims["heat_number"] == "H240115-001"
         assert disclosure_claims["chemical_composition"] == {
-            "carbon": 0.25, "manganese": 1.20, "phosphorus": 0.040, "sulfur": 0.050
+            "carbon": 0.25,
+            "manganese": 1.20,
+            "phosphorus": 0.040,
+            "sulfur": 0.050,
         }
         assert disclosure_claims["production_cost"] == 850.75
         assert disclosure_claims["quality_test_results"] == {
-            "tensile_strength": 420, "yield_strength": 350, "elongation": 18.5
+            "tensile_strength": 420,
+            "yield_strength": 350,
+            "elongation": 18.5,
         }
 
         # Step 7: Test hash consistency
@@ -159,10 +168,11 @@ class TestEDNAPIComprehensive:
         protected_header = {
             1: -7,  # ES256
             16: "application/sd-cwt",  # typ
-            4: issuer_thumbprint  # kid
+            4: issuer_thumbprint,  # kid
         }
 
         from sd_cwt.cose_sign1 import cose_sign1_sign
+
         sd_cwt = cose_sign1_sign(cbor_bytes, issuer.signer, protected_header=protected_header)
 
         # Step 9: Test presentation with selective disclosure
@@ -185,7 +195,7 @@ class TestEDNAPIComprehensive:
             disclosures=disclosures,
             selected_disclosures=selected_disclosures,
             audience="https://customs.us.example",
-            nonce="test_nonce_123"
+            nonce="test_nonce_123",
         )
 
         # Step 10: Test verification
@@ -195,8 +205,7 @@ class TestEDNAPIComprehensive:
 
         verifier = SDCWTVerifier(issuer_resolver)
         is_valid, verified_claims, tags_absent = verifier.verify_presentation(
-            kbt=kbt,
-            expected_audience="https://customs.us.example"
+            kbt=kbt, expected_audience="https://customs.us.example"
         )
 
         # Step 11: Validate verification results
@@ -214,7 +223,10 @@ class TestEDNAPIComprehensive:
         # Validate selected claims are disclosed
         assert verified_claims["heat_number"] == "H240115-001"
         assert verified_claims["chemical_composition"] == {
-            "carbon": 0.25, "manganese": 1.20, "phosphorus": 0.040, "sulfur": 0.050
+            "carbon": 0.25,
+            "manganese": 1.20,
+            "phosphorus": 0.040,
+            "sulfur": 0.050,
         }
 
         # Validate non-selected claims are NOT disclosed
@@ -311,28 +323,30 @@ class TestEDNAPIComprehensive:
         # Hex validation
         hex_string = cbor_bytes.hex()
         assert len(hex_string) % 2 == 0  # Even length
-        assert all(c in '0123456789abcdef' for c in hex_string)
+        assert all(c in "0123456789abcdef" for c in hex_string)
 
         # Specific hex pattern validation (deterministic with seed 123)
-        assert hex_string.startswith('a')  # CBOR map marker
+        assert hex_string.startswith("a")  # CBOR map marker
 
         # Dictionary validation
         decoded = cbor_utils.decode(cbor_bytes)
 
         # Validate specific CBOR data model instances
         validation_dict = {
-            "string_claim": (False, str),      # Should be redacted
-            "number_claim": (False, int),      # Should be redacted
-            "boolean_claim": (False, bool),    # Should be redacted
-            "array_claim": (True, list),       # Should be present (contains tag 60)
-            "object_claim": (True, dict),      # Should be present (nested "private" redacted)
+            "string_claim": (False, str),  # Should be redacted
+            "number_claim": (False, int),  # Should be redacted
+            "boolean_claim": (False, bool),  # Should be redacted
+            "array_claim": (True, list),  # Should be present (contains tag 60)
+            "object_claim": (True, dict),  # Should be present (nested "private" redacted)
             cbor_utils.create_simple_value(59): (True, list),  # Redacted hashes
         }
 
         for key, (should_be_present, expected_type) in validation_dict.items():
             if should_be_present:
                 assert key in decoded, f"Key {key} should be present"
-                assert isinstance(decoded[key], expected_type), f"Key {key} should be {expected_type}"
+                assert isinstance(
+                    decoded[key], expected_type
+                ), f"Key {key} should be {expected_type}"
             else:
                 assert key not in decoded, f"Key {key} should be redacted"
 
@@ -411,6 +425,7 @@ class TestEDNAPIComprehensive:
 
         # Test hash algorithm consistency (SHA-256)
         from sd_cwt.redaction import hash_disclosure
+
         computed_hash = hash_disclosure(disclosures[0])
         assert len(computed_hash) == 32  # SHA-256 = 32 bytes
 

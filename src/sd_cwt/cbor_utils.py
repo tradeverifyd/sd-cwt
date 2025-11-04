@@ -97,7 +97,7 @@ def is_simple_value(obj: Any, value: Union[int, None] = None) -> bool:
     Returns:
         True if the object is a CBOR simple value (and matches value if specified)
     """
-    if not isinstance(obj, CBORSimpleValue):
+    if not isinstance(obj, CBORSimpleValue):  # type: ignore[misc]
         return False
     if value is not None:
         return obj.value == value

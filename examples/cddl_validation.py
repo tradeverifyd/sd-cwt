@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Example demonstrating CDDL validation and CBOR EDN for SD-CWT and COSE Keys."""
 
-import base64
 import hashlib
 
 from sd_cwt import cbor_utils, edn_utils
@@ -14,7 +13,7 @@ def demonstrate_cbor_edn():
     print("=" * 60)
     print("CBOR Extended Diagnostic Notation (EDN) Demo")
     print("=" * 60)
-    
+
     # 1. SD-CWT Claims in EDN
     print("\n1. SD-CWT Claims in EDN:")
     sd_cwt_edn = '''
@@ -28,19 +27,19 @@ def demonstrate_cbor_edn():
         ]  / redacted_claim_keys (simple value 59) /
     }
     '''
-    
+
     # Remove comments for parsing
     import re
     clean_edn = re.sub(r'/[^/]*/|#[^\n]*', '', sd_cwt_edn)
-    
+
     print("  EDN representation:")
     print("  " + clean_edn.strip().replace("\n", "\n  "))
-    
+
     # Convert to CBOR
     cbor_data = edn_utils.diag_to_cbor(clean_edn)
     print(f"\n  CBOR hex: {cbor_data.hex()[:60]}...")
     print(f"  CBOR size: {len(cbor_data)} bytes")
-    
+
     # 2. COSE Key in EDN
     print("\n2. COSE EC2 Key in EDN:")
     ec2_key_edn = '''
@@ -52,11 +51,11 @@ def demonstrate_cbor_edn():
         -3: h'20138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28bbfc117e'
     }
     '''
-    
+
     clean_edn = re.sub(r'/[^/]*/', '', ec2_key_edn)
     print("  EDN representation:")
     print("  " + clean_edn.strip().replace("\n", "\n  "))
-    
+
     # 3. Disclosure Array in EDN
     print("\n3. Disclosure Array in EDN:")
     disclosure_edn = '[h\'73616c74\', "BATCH-2024-001", "batch_id"]'  # SD-CWT format: [salt, value, key]
@@ -73,7 +72,7 @@ def demonstrate_cddl_validation():
     print("\n" + "=" * 60)
     print("CDDL Schema Validation Demo")
     print("=" * 60)
-    
+
     # Create a valid SD-CWT claims structure
     claims = {
         1: "https://issuer.example.com",  # iss
@@ -84,21 +83,21 @@ def demonstrate_cddl_validation():
             hashlib.sha256(b"disclosure2").digest(),
         ],
     }
-    
+
     print("\n1. SD-CWT Claims Structure:")
     print(f"   Issuer: {claims[1]}")
     print(f"   Subject: {claims[2]}")
     print(f"   Issued At: {claims[6]}")
     print(f"   Redacted Claim Keys: {len(claims[59])} hashes")
-    
+
     # Convert to CBOR
     cbor_data = cbor_utils.encode(claims)
-    
+
     # Convert to EDN for display
     edn = edn_utils.cbor_to_diag(cbor_data)
     print("\n2. CBOR Diagnostic Notation:")
     print(f"   {edn[:200]}...")
-    
+
     # Try CDDL validation with zcbor
     print("\n3. CDDL Validation:")
     try:
@@ -118,7 +117,7 @@ def demonstrate_cose_key_validation():
     print("\n" + "=" * 60)
     print("COSE Key Structure Validation Demo")
     print("=" * 60)
-    
+
     # Create different COSE key types
     keys = {
         "EC2": {
@@ -146,18 +145,18 @@ def demonstrate_cose_key_validation():
             -1: b"k" * 32,  # key value
         },
     }
-    
+
     for key_type, key in keys.items():
         print(f"\n{key_type} Key:")
-        
+
         # Compute thumbprint (excludes optional fields)
         thumbprint = CoseKeyThumbprint.compute(key, "sha256")
         print(f"  Thumbprint: {thumbprint.hex()[:32]}...")
-        
+
         # Show canonical structure
         canonical = CoseKeyThumbprint.canonical_cbor(key)
         print(f"  Canonical CBOR size: {len(canonical)} bytes")
-        
+
         # Convert to EDN
         edn = edn_utils.cbor_to_diag(canonical)
         print(f"  Canonical EDN: {edn[:100]}...")
@@ -168,7 +167,7 @@ def demonstrate_test_vectors():
     print("\n" + "=" * 60)
     print("Test Vector Structure Demo")
     print("=" * 60)
-    
+
     # Create a test vector
     test_vector = {
         "description": "EC2 P-256 key thumbprint test",
@@ -190,25 +189,25 @@ def demonstrate_test_vectors():
             "thumbprint_uri": None,  # Will be computed
         },
     }
-    
+
     # Compute actual values
     key = test_vector["input"]["key"]
     thumbprint = CoseKeyThumbprint.compute(key, "sha256")
     uri = CoseKeyThumbprint.uri(key, "sha256")
-    
+
     test_vector["output"]["thumbprint"] = thumbprint
     test_vector["output"]["thumbprint_uri"] = uri
-    
+
     print("\n1. Test Vector:")
     print(f"   Description: {test_vector['description']}")
     print(f"   Key Type: EC2 (kty={key[1]})")
     print(f"   Curve: P-256 (crv={key[-1]})")
     print(f"   Hash Algorithm: {test_vector['input']['hash_alg']}")
-    
+
     print("\n2. Output:")
     print(f"   Thumbprint: {thumbprint.hex()}")
     print(f"   URI: {uri}")
-    
+
     # Convert to CBOR and show size
     cbor_data = cbor_utils.encode(test_vector)
     print(f"\n3. Encoded size: {len(cbor_data)} bytes")
@@ -238,29 +237,29 @@ def demonstrate_real_world_example():
 
     # Select claims for selective disclosure (sensitive business info)
     sd_claims = ["inspector_license_number", "product_batch_id", "facility_location"]
-    
+
     print("\n1. Original Claims:")
     for k, v in all_claims.items():
         if isinstance(v, dict):
             print(f"   {k}: <complex object>")
         else:
             print(f"   {k}: {v}")
-    
+
     # Create disclosures
     disclosures = []
     sd_hashes = []
-    
+
     for claim_name in sd_claims:
         if claim_name in all_claims:
             salt = hashlib.sha256(f"salt_{claim_name}".encode()).digest()[:16]
             disclosure = [salt, all_claims[claim_name], claim_name]  # SD-CWT format: [salt, value, key]
             disclosures.append(disclosure)
-            
+
             # Hash the disclosure
             disclosure_cbor = cbor_utils.encode(disclosure)
             sd_hash = hashlib.sha256(disclosure_cbor).digest()
             sd_hashes.append(sd_hash)
-    
+
     # Create SD-CWT claims (without disclosed claims)
     sd_cwt_claims = {
         1: all_claims["iss"],  # iss
@@ -268,16 +267,16 @@ def demonstrate_real_world_example():
         6: all_claims["iat"],  # iat
         59: sd_hashes,  # redacted_claim_keys (simple value 59)
     }
-    
+
     print(f"\n2. SD-CWT Claims (after removing {len(sd_claims)} claims):")
     print(f"   Issuer: {sd_cwt_claims[1]}")
     print(f"   Subject: {sd_cwt_claims[2]}")
     print(f"   Redacted Claim Keys: {len(sd_cwt_claims[59])} hashes")
-    
+
     print("\n3. Disclosures Created:")
     for i, disclosure in enumerate(disclosures):
         print(f"   #{i+1}: [{len(disclosure[0])} bytes salt, '{disclosure[1]}', ...]")
-    
+
     # Entity selects claims to reveal to supply chain partner
     revealed = ["inspector_license_number", "inspection_date"]
 
@@ -291,13 +290,13 @@ def main():
     """Run all demonstrations."""
     print("\nCDDL and CBOR EDN Validation Examples")
     print("=" * 60)
-    
+
     demonstrate_cbor_edn()
     demonstrate_cddl_validation()
     demonstrate_cose_key_validation()
     demonstrate_test_vectors()
     demonstrate_real_world_example()
-    
+
     print("\n" + "=" * 60)
     print("Demo completed!")
     print("=" * 60)

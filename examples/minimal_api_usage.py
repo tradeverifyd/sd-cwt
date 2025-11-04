@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Example of using the minimal public API for COSE Sign1."""
 
-from typing import Any
 import sd_cwt
 
 

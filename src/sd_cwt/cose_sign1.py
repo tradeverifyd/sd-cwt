@@ -174,24 +174,17 @@ class ES256Signer:
             private_key_bytes: The private key bytes (32 bytes for P-256)
         """
         # Create private key from bytes
-        private_value = int.from_bytes(private_key_bytes, byteorder='big')
-        self.private_key = ec.derive_private_key(
-            private_value,
-            ec.SECP256R1(),
-            default_backend()
-        )
+        private_value = int.from_bytes(private_key_bytes, byteorder="big")
+        self.private_key = ec.derive_private_key(private_value, ec.SECP256R1(), default_backend())
 
     def sign(self, message: bytes) -> bytes:
         """Sign a message with ES256."""
         # Sign the message
-        signature_der = self.private_key.sign(
-            message,
-            ec.ECDSA(hashes.SHA256())
-        )
+        signature_der = self.private_key.sign(message, ec.ECDSA(hashes.SHA256()))
 
         # Convert DER to raw (r||s) format for COSE
         r, s = utils.decode_dss_signature(signature_der)
-        signature = r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
+        signature = r.to_bytes(32, byteorder="big") + s.to_bytes(32, byteorder="big")
 
         return signature
 
@@ -212,8 +205,8 @@ class ES256Verifier:
             public_key_y: Y coordinate of public key (32 bytes)
         """
         # Create public key from coordinates
-        x = int.from_bytes(public_key_x, byteorder='big')
-        y = int.from_bytes(public_key_y, byteorder='big')
+        x = int.from_bytes(public_key_x, byteorder="big")
+        y = int.from_bytes(public_key_y, byteorder="big")
 
         public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256R1())
         self.public_key = public_numbers.public_key(default_backend())
@@ -225,16 +218,47 @@ class ES256Verifier:
             if len(signature) != 64:
                 return False
 
-            r = int.from_bytes(signature[:32], byteorder='big')
-            s = int.from_bytes(signature[32:], byteorder='big')
+            r = int.from_bytes(signature[:32], byteorder="big")
+            s = int.from_bytes(signature[32:], byteorder="big")
             signature_der = utils.encode_dss_signature(r, s)
 
             # Verify the signature
-            self.public_key.verify(
-                signature_der,
-                message,
-                ec.ECDSA(hashes.SHA256())
-            )
+            self.public_key.verify(signature_der, message, ec.ECDSA(hashes.SHA256()))
+            return True
+
+        except InvalidSignature:
+            return False
+        except (ValueError, TypeError):
+            return False
+
+
+class ES384Verifier:
+    """ECDSA P-384 SHA-384 verifier implementation."""
+
+    def __init__(self, public_key_x: bytes, public_key_y: bytes):
+        """Initialize ES384 verifier with public key coordinates.
+
+        Args:
+            public_key_x: X coordinate of public key (48 bytes)
+            public_key_y: Y coordinate of public key (48 bytes)
+        """
+        x = int.from_bytes(public_key_x, byteorder="big")
+        y = int.from_bytes(public_key_y, byteorder="big")
+
+        public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP384R1())
+        self.public_key = public_numbers.public_key(default_backend())
+
+    def verify(self, message: bytes, signature: bytes) -> bool:
+        """Verify a signature with ES384."""
+        try:
+            if len(signature) != 96:
+                return False
+
+            r = int.from_bytes(signature[:48], byteorder="big")
+            s = int.from_bytes(signature[48:], byteorder="big")
+            signature_der = utils.encode_dss_signature(r, s)
+
+            self.public_key.verify(signature_der, message, ec.ECDSA(hashes.SHA384()))
             return True
 
         except InvalidSignature:
@@ -254,13 +278,13 @@ def generate_es256_key_pair() -> tuple[bytes, bytes, bytes]:
 
     # Get private key bytes
     private_value = private_key.private_numbers().private_value
-    private_key_bytes = private_value.to_bytes(32, byteorder='big')
+    private_key_bytes = private_value.to_bytes(32, byteorder="big")
 
     # Get public key coordinates
     public_key = private_key.public_key()
     public_numbers = public_key.public_numbers()
 
-    public_key_x = public_numbers.x.to_bytes(32, byteorder='big')
-    public_key_y = public_numbers.y.to_bytes(32, byteorder='big')
+    public_key_x = public_numbers.x.to_bytes(32, byteorder="big")
+    public_key_y = public_numbers.y.to_bytes(32, byteorder="big")
 
     return private_key_bytes, public_key_x, public_key_y

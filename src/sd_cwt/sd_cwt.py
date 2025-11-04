@@ -27,7 +27,7 @@ def create_sd_cwt_with_holder_binding(
     holder_key: Optional[bytes] = None,
     use_thumbprint: bool = False,
     salt_generator: Optional[SaltGenerator] = None,
-    issuer_key_id: Optional[bytes] = None
+    issuer_key_id: Optional[bytes] = None,
 ) -> dict[str, Any]:
     """Create a complete SD-CWT with mandatory holder binding.
 
@@ -69,7 +69,7 @@ def create_sd_cwt_with_holder_binding(
     )
 
     # Create protected header for issuer signature
-    protected_header = {
+    protected_header: dict[int, Any] = {
         1: issuer_signer.algorithm,  # Algorithm
     }
 
@@ -81,17 +81,9 @@ def create_sd_cwt_with_holder_binding(
     payload = cbor_utils.encode(sd_cwt_claims)
 
     # Sign the SD-CWT
-    sd_cwt = cose_sign1_sign(
-        payload,
-        issuer_signer,
-        protected_header=protected_header
-    )
+    sd_cwt = cose_sign1_sign(payload, issuer_signer, protected_header=protected_header)
 
-    return {
-        "sd_cwt": sd_cwt,
-        "disclosures": disclosures,
-        "holder_key": holder_key
-    }
+    return {"sd_cwt": sd_cwt, "disclosures": disclosures, "holder_key": holder_key}
 
 
 def create_sd_cwt_presentation(
@@ -102,7 +94,7 @@ def create_sd_cwt_presentation(
     verifier_audience: str,
     issued_at: int,
     cnonce: Optional[bytes] = None,
-    holder_key_id: Optional[bytes] = None
+    holder_key_id: Optional[bytes] = None,
 ) -> bytes:
     """Create an SD-CWT presentation with selected disclosures and SD-KBT.
 
@@ -123,20 +115,12 @@ def create_sd_cwt_presentation(
     selected_disclosures = [all_disclosures[i] for i in selected_disclosure_indices]
 
     # Create SD-CWT with selected disclosures structure
-    sd_cwt_with_disclosures_dict = {
-        "sd_cwt": sd_cwt,
-        "disclosures": selected_disclosures
-    }
+    sd_cwt_with_disclosures_dict = {"sd_cwt": sd_cwt, "disclosures": selected_disclosures}
     sd_cwt_with_disclosures = cbor_utils.encode(sd_cwt_with_disclosures_dict)
 
     # Create and return SD-KBT
     return create_sd_kbt(
-        sd_cwt_with_disclosures,
-        holder_signer,
-        verifier_audience,
-        issued_at,
-        cnonce,
-        holder_key_id
+        sd_cwt_with_disclosures, holder_signer, verifier_audience, issued_at, cnonce, holder_key_id
     )
 
 
@@ -158,14 +142,14 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
     """
     from .holder_binding import validate_sd_kbt_structure
 
-    result = {
+    result: dict[str, Any] = {
         "valid": False,
         "sd_cwt": None,
         "disclosures": [],
         "audience": None,
         "issued_at": None,
         "cnonce": None,
-        "errors": []
+        "errors": [],
     }
 
     # Validate SD-KBT structure
@@ -203,14 +187,16 @@ def validate_sd_cwt_presentation(sd_kbt: bytes) -> dict[str, Any]:
             return result
 
         # Success
-        result.update({
-            "valid": True,
-            "sd_cwt": sd_cwt,
-            "disclosures": disclosures,
-            "audience": extracted_info["aud"],
-            "issued_at": extracted_info["iat"],
-            "cnonce": extracted_info["cnonce"]
-        })
+        result.update(
+            {
+                "valid": True,
+                "sd_cwt": sd_cwt,
+                "disclosures": disclosures,
+                "audience": extracted_info["aud"],
+                "issued_at": extracted_info["iat"],
+                "cnonce": extracted_info["cnonce"],
+            }
+        )
 
     except Exception as e:
         result["errors"].append(f"Validation error: {str(e)}")
@@ -233,11 +219,7 @@ def extract_verified_claims(sd_kbt: bytes) -> dict[str, Any]:
         - claims: Complete claims map with disclosed values (if valid)
         - errors: List of errors encountered
     """
-    result = {
-        "valid": False,
-        "claims": {},
-        "errors": []
-    }
+    result: dict[str, Any] = {"valid": False, "claims": {}, "errors": []}
 
     # First validate the presentation
     validation_result = validate_sd_cwt_presentation(sd_kbt)

@@ -5,7 +5,7 @@ This module provides safe verifier classes for SD-CWT verification:
 - PresentationVerifier: Verifies KBT presentations using holder's key
 """
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from . import cbor_utils
 from .cose_sign1 import ES256Verifier, cose_sign1_verify
@@ -222,7 +222,7 @@ def get_presentation_verifier(
 
         def single_key_resolver(kid: bytes) -> dict[int, Any]:
             if kid == holder_thumbprint:
-                return holder_key
+                return cast(dict[int, Any], holder_key)
             raise ValueError(f"Key not found: {kid.hex()}")
 
         return PresentationVerifier(single_key_resolver)

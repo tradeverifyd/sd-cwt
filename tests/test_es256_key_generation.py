@@ -76,7 +76,7 @@ class TestES256KeyGeneration:
         # Test hex representation for interoperability
         hex_cbor = private_key_cbor.hex()
         assert isinstance(hex_cbor, str)
-        assert all(c in '0123456789abcdef' for c in hex_cbor.lower())
+        assert all(c in "0123456789abcdef" for c in hex_cbor.lower())
 
         # Verify hex roundtrip
         from_hex = bytes.fromhex(hex_cbor)
@@ -285,15 +285,15 @@ class TestES256KeyGeneration:
         private_key = key[-4]
 
         # Coordinates should not be all zeros or all ones
-        assert x_coord != b'\x00' * 32, "X coordinate should not be all zeros"
-        assert y_coord != b'\x00' * 32, "Y coordinate should not be all zeros"
-        assert private_key != b'\x00' * 32, "Private key should not be all zeros"
-        assert x_coord != b'\xff' * 32, "X coordinate should not be all ones"
-        assert y_coord != b'\xff' * 32, "Y coordinate should not be all ones"
-        assert private_key != b'\xff' * 32, "Private key should not be all ones"
+        assert x_coord != b"\x00" * 32, "X coordinate should not be all zeros"
+        assert y_coord != b"\x00" * 32, "Y coordinate should not be all zeros"
+        assert private_key != b"\x00" * 32, "Private key should not be all zeros"
+        assert x_coord != b"\xff" * 32, "X coordinate should not be all ones"
+        assert y_coord != b"\xff" * 32, "Y coordinate should not be all ones"
+        assert private_key != b"\xff" * 32, "Private key should not be all ones"
 
         # Private key should be in valid range (1 to n-1 where n is curve order)
-        private_int = int.from_bytes(private_key, 'big')
+        private_int = int.from_bytes(private_key, "big")
         assert private_int > 0, "Private key should be positive"
         # P-256 curve order (approximately)
         p256_order = 2**256 - 2**224 + 2**192 + 2**96 - 1
@@ -324,10 +324,10 @@ class TestES256KeyGeneration:
         assert "-3:" in edn_output, "EDN should contain y field"
 
         # Hex encoding should be lowercase and valid
-        for line in edn_output.split('\n'):
+        for line in edn_output.split("\n"):
             if "h'" in line:
                 hex_part = line.split("h'")[1].split("'")[0]
-                assert all(c in '0123456789abcdef' for c in hex_part.lower())
+                assert all(c in "0123456789abcdef" for c in hex_part.lower())
 
     def test_error_conditions(self):
         """Test error conditions and edge cases."""

@@ -2,7 +2,7 @@
 
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Optional
 
 from . import cbor_utils
 from .cose_sign1 import cose_sign1_sign
@@ -13,9 +13,8 @@ from .thumbprint import CoseKeyThumbprint
 
 
 def select_disclosures_by_claim_names(
-    disclosures: List[bytes],
-    claim_names: List[str]
-) -> List[bytes]:
+    disclosures: list[bytes], claim_names: list[str]
+) -> list[bytes]:
     """Select disclosures that match the specified claim names.
 
     Args:
@@ -41,13 +40,13 @@ def select_disclosures_by_claim_names(
 
 
 def create_edn_with_annotations(
-    base_claims: Dict[str, Any],
-    optional_claims: Dict[str, Any],
+    base_claims: dict[str, Any],
+    optional_claims: dict[str, Any],
     issuer: str = "https://issuer.example",
     subject: str = "https://subject.example",
-    holder_public_key: bytes = None,
+    holder_public_key: Optional[bytes] = None,
     use_holder_thumbprint: bool = False,
-    issued_at: Optional[int] = None
+    issued_at: Optional[int] = None,
 ) -> str:
     """Create EDN string with selective disclosure annotations.
 
@@ -115,7 +114,7 @@ def create_edn_with_annotations(
     return "\n".join(edn_parts)
 
 
-def _format_cnf_for_edn(cnf_claim: Dict[int, Any]) -> str:
+def _format_cnf_for_edn(cnf_claim: dict[int, Any]) -> str:
     """Format cnf claim for EDN representation."""
     if 1 in cnf_claim:  # Full COSE key
         key = cnf_claim[1]
@@ -158,7 +157,7 @@ def _format_value_for_edn(value: Any) -> str:
 class SDCWTIssuer:
     """Simple API for issuing SD-CWTs with selective disclosure."""
 
-    def __init__(self, issuer_private_key: Dict[int, Any]):
+    def __init__(self, issuer_private_key: dict[int, Any]):
         """Initialize with issuer's private key.
 
         Args:
@@ -169,13 +168,13 @@ class SDCWTIssuer:
 
     def issue_credential(
         self,
-        base_claims: Dict[str, Any],
-        optional_claims: Dict[str, Any],
+        base_claims: dict[str, Any],
+        optional_claims: dict[str, Any],
         holder_public_key: bytes,
         issuer: str = "https://issuer.example",
         subject: str = "https://subject.example",
         use_holder_thumbprint: bool = False,
-    ) -> Tuple[bytes, str, List[bytes]]:
+    ) -> tuple[bytes, str, list[bytes]]:
         """Issue an SD-CWT credential with selective disclosure.
 
         Args:
@@ -203,7 +202,7 @@ class SDCWTIssuer:
             issuer=issuer,
             subject=subject,
             holder_public_key=holder_public_key,
-            use_holder_thumbprint=use_holder_thumbprint
+            use_holder_thumbprint=use_holder_thumbprint,
         )
 
         # Convert EDN to redacted CBOR
@@ -214,7 +213,7 @@ class SDCWTIssuer:
         protected_header = {
             1: -7,  # ES256
             16: "application/sd-cwt",  # typ
-            4: issuer_thumbprint  # kid
+            4: issuer_thumbprint,  # kid
         }
 
         payload_cbor = cbor_utils.encode(redacted_claims)
@@ -223,10 +222,7 @@ class SDCWTIssuer:
         return sd_cwt, edn_string, disclosures
 
 
-def create_presentation_edn(
-    original_edn: str,
-    selected_claims: List[str]
-) -> str:
+def create_presentation_edn(original_edn: str, selected_claims: list[str]) -> str:
     """Create a presentation EDN with selected claims disclosed.
 
     Args:
@@ -243,12 +239,12 @@ def create_presentation_edn(
         )
     """
     # Parse the original EDN and rebuild with selected disclosures
-    lines = original_edn.strip().split('\n')
+    lines = original_edn.strip().split("\n")
     presentation_lines = []
 
     for line in lines:
         line = line.strip()
-        if not line or line in ['{', '}']:
+        if not line or line in ["{", "}"]:
             presentation_lines.append(line)
             continue
 
@@ -262,21 +258,21 @@ def create_presentation_edn(
         if disclosed:
             # Remove tag 58 wrapper for disclosed claims
             # Transform: "claim": 58(value), -> "claim": value,
-            clean_line = re.sub(r'58\(([^)]+)\)', r'\1', line)
+            clean_line = re.sub(r"58\(([^)]+)\)", r"\1", line)
             presentation_lines.append(clean_line)
         else:
             # Keep standard claims (iss, sub, iat, cnf) and non-disclosed claims as-is
-            if any(std_claim in line for std_claim in ['1:', '2:', '6:', '8:']):
+            if any(std_claim in line for std_claim in ["1:", "2:", "6:", "8:"]):
                 presentation_lines.append(line)
             # Skip optional claims that are not selected for disclosure
 
-    return '\n'.join(presentation_lines)
+    return "\n".join(presentation_lines)
 
 
 class SDCWTPresenter:
     """Simple API for creating SD-CWT presentations."""
 
-    def __init__(self, holder_private_key: Dict[int, Any]):
+    def __init__(self, holder_private_key: dict[int, Any]):
         """Initialize with holder's private key.
 
         Args:
@@ -288,10 +284,10 @@ class SDCWTPresenter:
     def create_presentation(
         self,
         sd_cwt: bytes,
-        disclosures: List[bytes],
-        selected_disclosures: List[bytes],
+        disclosures: list[bytes],
+        selected_disclosures: list[bytes],
         audience: str,
-        nonce: Optional[str] = None
+        nonce: Optional[str] = None,
     ) -> bytes:
         """Create a presentation with selected claims disclosed.
 
@@ -331,15 +327,13 @@ class SDCWTPresenter:
             audience=audience,
             issued_at=current_time,
             cnonce=cnonce,
-            key_id=holder_thumbprint
+            key_id=holder_thumbprint,
         )
 
         return kbt
 
     def _create_sd_cwt_with_selected_disclosures(
-        self,
-        original_sd_cwt: bytes,
-        selected_disclosures: List[bytes]
+        self, original_sd_cwt: bytes, selected_disclosures: list[bytes]
     ) -> bytes:
         """Create SD-CWT with only selected disclosures in unprotected header.
 
@@ -380,14 +374,14 @@ class SDCWTPresenter:
             protected_header_bytes,
             new_unprotected,
             payload_bytes,
-            signature_bytes
+            signature_bytes,
         ]
 
         # Re-wrap with tag if original was tagged
+        new_cose_sign1: Any
         if cbor_utils.is_tag(cose_sign1):
             new_cose_sign1 = cbor_utils.create_tag(
-                cbor_utils.get_tag_number(cose_sign1),
-                new_cose_sign1_value
+                cbor_utils.get_tag_number(cose_sign1), new_cose_sign1_value
             )
         else:
             new_cose_sign1 = new_cose_sign1_value
@@ -399,21 +393,22 @@ class SDCWTPresenter:
 class SDCWTVerifier:
     """Simple API for verifying SD-CWT presentations."""
 
-    def __init__(self, public_key_resolver):
+    def __init__(self, public_key_resolver: Callable[[bytes], dict[int, Any]]) -> None:
         """Initialize with a public key resolver.
 
         Args:
             public_key_resolver: Function that resolves key IDs to COSE keys
         """
         from .verifiers import CredentialVerifier
+
         self.credential_verifier = CredentialVerifier(public_key_resolver)
 
     def verify_presentation(
         self,
         kbt: bytes,
         expected_audience: str,
-        holder_key_resolver=None
-    ) -> Tuple[bool, Optional[Dict[str, Any]], bool]:
+        holder_key_resolver: Optional[Callable[[bytes], dict[int, Any]]] = None,
+    ) -> tuple[bool, Optional[dict[str, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 
         Args:
@@ -464,9 +459,7 @@ class SDCWTVerifier:
 
             # Get presentation verifier for KBT verification
             presentation_verifier = get_presentation_verifier(
-                sd_cwt,
-                self.credential_verifier,
-                holder_key_resolver
+                sd_cwt, self.credential_verifier, holder_key_resolver
             )
 
             if presentation_verifier is None:
@@ -486,11 +479,12 @@ class SDCWTVerifier:
 
         except Exception as e:
             import traceback
+
             print(f"Verification error: {e}")  # For debugging
             traceback.print_exc()
             return False, None, False
 
-    def _extract_clean_claims(self, payload: Dict[int, Any]) -> Tuple[Dict[str, Any], bool]:
+    def _extract_clean_claims(self, payload: dict[int, Any]) -> tuple[dict[str, Any], bool]:
         """Extract claims and check if redaction tags are absent.
 
         Args:
@@ -505,13 +499,13 @@ class SDCWTVerifier:
         for key, value in payload.items():
             # Handle standard JWT claims
             if key == 1:
-                clean_claims['iss'] = value
+                clean_claims["iss"] = value
                 continue
             elif key == 2:
-                clean_claims['sub'] = value
+                clean_claims["sub"] = value
                 continue
             elif key == 6:
-                clean_claims['iat'] = value
+                clean_claims["iat"] = value
                 continue
             elif key == 8:
                 # cnf claim - don't include in clean claims
@@ -533,10 +527,8 @@ class SDCWTVerifier:
         return clean_claims, tags_absent
 
     def _reconstruct_verified_claims(
-        self,
-        sd_cwt_with_disclosures: bytes,
-        payload: Dict[int, Any]
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, sd_cwt_with_disclosures: bytes, payload: dict[int, Any]
+    ) -> tuple[dict[str, Any], bool]:
         """Reconstruct verified claims from SD-CWT payload and disclosures.
 
         Args:
@@ -577,11 +569,11 @@ class SDCWTVerifier:
                                 elif isinstance(key, int):
                                     # Handle numeric keys by converting to standard claim names
                                     if key == 1:
-                                        clean_claims['iss'] = value
+                                        clean_claims["iss"] = value
                                     elif key == 2:
-                                        clean_claims['sub'] = value
+                                        clean_claims["sub"] = value
                                     elif key == 6:
-                                        clean_claims['iat'] = value
+                                        clean_claims["iat"] = value
                                     # Add other numeric key mappings as needed
 
         except Exception:
@@ -593,7 +585,7 @@ class SDCWTVerifier:
 
         return clean_claims, tags_absent
 
-    def _clean_value_recursive(self, value: Any) -> Tuple[Any, bool]:
+    def _clean_value_recursive(self, value: Any) -> tuple[Any, bool]:
         """Recursively clean a value and check for redaction tags.
 
         Returns:
@@ -607,11 +599,15 @@ class SDCWTVerifier:
             if tag_number in [58, 59, 60]:
                 is_clean = False
                 # Return the tag value, cleaned recursively
-                inner_value, inner_clean = self._clean_value_recursive(cbor_utils.get_tag_value(value))
+                inner_value, inner_clean = self._clean_value_recursive(
+                    cbor_utils.get_tag_value(value)
+                )
                 return inner_value, inner_clean
             else:
                 # Other tags - keep as is but check inner value
-                inner_value, inner_clean = self._clean_value_recursive(cbor_utils.get_tag_value(value))
+                inner_value, inner_clean = self._clean_value_recursive(
+                    cbor_utils.get_tag_value(value)
+                )
                 return value, inner_clean
 
         elif isinstance(value, dict):
