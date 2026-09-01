@@ -343,3 +343,105 @@ class TestRolesWithAppendixCKeys:
         collect(payload)
         for disclosure in embedded_arr[1][17]:
             assert hash_disclosure(disclosure) in redacted
+
+
+def _collect_redacted_hashes(node: object, found: set) -> None:
+    """Gather every Redacted Claim Hash visible in a claims structure."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == cbor_utils.create_simple_value(59):
+                found.update(value)
+            else:
+                _collect_redacted_hashes(value, found)
+    elif isinstance(node, list):
+        for item in node:
+            if cbor_utils.is_tag(item, 60):
+                found.add(item.value)
+            else:
+                _collect_redacted_hashes(item, found)
+
+
+def _resolve_iteratively(payload: dict, disclosures: list) -> list:
+    """Return the disclosures that never matched a Redacted Claim Hash.
+
+    Appendix A is iterative: revealing a disclosure can expose hashes nested
+    inside its value, which later disclosures then match. Checking every
+    disclosure against only the outermost hashes fails on the nested examples.
+    """
+    hashes: set = set()
+    _collect_redacted_hashes(payload, hashes)
+
+    remaining = list(disclosures)
+    progress = True
+    while progress:
+        progress = False
+        still_unmatched = []
+        for disclosure in remaining:
+            if hash_disclosure(disclosure) in hashes:
+                progress = True
+                entry = cbor_utils.decode(disclosure)
+                if len(entry) >= 2:  # a decoy is [salt] alone and reveals nothing
+                    _collect_redacted_hashes(entry[1], hashes)
+            else:
+                still_unmatched.append(disclosure)
+        remaining = still_unmatched
+    return remaining
+
+
+class TestEveryCanonicalExample:
+    """The four examples the worked example does not reach: decoys, and nesting."""
+
+    @pytest.mark.parametrize(
+        ("filename", "disclosure_count", "decoy_count"),
+        [
+            ("issuer_cwt.cbor", 5, 0),
+            ("decoy.cbor", 4, 2),
+            ("nested_issuer_cwt.cbor", 15, 0),
+            ("nested_cwt.cbor", 7, 0),
+        ],
+    )
+    def test_issued_examples_verify_and_resolve(
+        self, filename, disclosure_count, decoy_count, issuer_resolver
+    ) -> None:
+        token = (FIXTURES / filename).read_bytes()
+
+        is_valid, _ = CredentialVerifier(issuer_resolver).verify(token)
+        assert is_valid, f"{filename} must verify under the Appendix C issuer key"
+
+        arr = cbor_utils.get_tag_value(cbor_utils.decode(token))
+        disclosures = arr[1][17]
+        assert len(disclosures) == disclosure_count
+
+        # A decoy is a one-element array carrying only a salt.
+        decoys = [d for d in disclosures if len(cbor_utils.decode(d)) == 1]
+        assert len(decoys) == decoy_count
+
+        payload = cbor_utils.decode(arr[2])
+        unresolved = _resolve_iteratively(payload, disclosures)
+        assert unresolved == [], (
+            f"{len(unresolved)} of {disclosure_count} disclosures in {filename} matched no "
+            "Redacted Claim Hash"
+        )
+
+    @pytest.mark.parametrize("filename", ["kbt.cbor", "nested_kbt.cbor"])
+    def test_presentations_verify_end_to_end(self, filename, issuer_resolver) -> None:
+        kbt = (FIXTURES / filename).read_bytes()
+        arr = cbor_utils.get_tag_value(cbor_utils.decode(kbt))
+        protected = cbor_utils.decode(arr[0])
+        embedded = kcwt_to_bytes(protected[13])
+
+        credential_verifier = CredentialVerifier(issuer_resolver)
+        is_valid, _ = credential_verifier.verify(embedded)
+        assert is_valid, f"the SD-CWT embedded in {filename} must verify"
+
+        presentation_verifier = get_presentation_verifier(embedded, credential_verifier)
+        assert presentation_verifier is not None
+
+        audience = cbor_utils.decode(arr[2])[3]
+        is_valid, _ = presentation_verifier.verify(kbt, audience=audience)
+        assert is_valid, f"the Holder signature on {filename} must verify"
+
+        inner = cbor_utils.get_tag_value(cbor_utils.decode(embedded))
+        payload = cbor_utils.decode(inner[2])
+        unresolved = _resolve_iteratively(payload, inner[1][17])
+        assert unresolved == [], "every presented disclosure must resolve"
