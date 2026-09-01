@@ -352,7 +352,7 @@ class ES512Verifier:
 
 # COSE algorithm identifier -> verifier class.
 _EC2_VERIFIERS: dict[int, Any] = {
-    -7: ES256Verifier,   # ES256 / P-256
+    -7: ES256Verifier,  # ES256 / P-256
     -35: ES384Verifier,  # ES384 / P-384
     -36: ES512Verifier,  # ES512 / P-521
 }
@@ -362,7 +362,7 @@ _EC2_VERIFIERS: dict[int, Any] = {
 _CRV_TO_ALG: dict[int, int] = {1: -7, 2: -35, 3: -36}
 
 _EC2_SIGNERS: dict[int, Any] = {
-    -7: ES256Signer,   # ES256 / P-256
+    -7: ES256Signer,  # ES256 / P-256
     -35: ES384Signer,  # ES384 / P-384
     -36: ES512Signer,  # ES512 / P-521
 }
