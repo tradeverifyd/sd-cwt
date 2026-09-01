@@ -2,11 +2,11 @@
 
 import re
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from . import cbor_utils
 from .cose_sign1 import cose_sign1_sign
-from .holder_binding import create_cnf_claim, create_sd_kbt
+from .holder_binding import create_cnf_claim, create_sd_kbt, kcwt_to_bytes
 from .redaction import edn_to_redacted_cbor
 from .signers import CredentialSigner, PresentationSigner
 from .thumbprint import CoseKeyThumbprint
@@ -47,6 +47,7 @@ def create_edn_with_annotations(
     holder_public_key: Optional[bytes] = None,
     use_holder_thumbprint: bool = False,
     issued_at: Optional[int] = None,
+    vct: Optional[bytes] = None,
 ) -> str:
     """Create EDN string with selective disclosure annotations.
 
@@ -58,6 +59,9 @@ def create_edn_with_annotations(
         holder_public_key: CBOR-encoded holder's public key
         use_holder_thumbprint: Whether to use thumbprint in cnf claim
         issued_at: Optional timestamp (uses current time if None)
+        vct: Optional verifiable credential type (claim 11). The CDDL declares
+            `? &(vct: 11) ^ => bstr`, so this is bytes, and the claim is left
+            out entirely when None.
 
     Returns:
         EDN string with proper tag annotations matching guide.md format
@@ -98,8 +102,13 @@ def create_edn_with_annotations(
         f'  2: "{subject}",',
         f"  6: {current_time},",
         f"  8: {cnf_edn},",
-        '  11: "https://steel.consortium.example/rebar/v1.cddl",',
     ]
+
+    # vct is optional. It used to be hardcoded to a sample URL as a text string,
+    # which put an unrelated claim in every credential and violated the CDDL:
+    # claim 11 is a bstr, not a tstr.
+    if vct is not None:
+        edn_parts.append(f"  11: h'{vct.hex()}',")
 
     # Add base claims (mandatory to disclose) - these are not wrapped in tags
     for key, value in base_claims.items():
@@ -134,7 +143,13 @@ def _format_cnf_for_edn(cnf_claim: dict[int, Any]) -> str:
 
 def _format_value_for_edn(value: Any) -> str:
     """Format a value for EDN representation."""
-    if isinstance(value, str):
+    if isinstance(value, bool):
+        # Must precede the int branch: bool is a subclass of int in Python, so
+        # `str(True)` would otherwise emit "True", which is not valid EDN.
+        return "true" if value else "false"
+    elif value is None:
+        return "null"
+    elif isinstance(value, str):
         return f'"{value}"'
     elif isinstance(value, (int, float)):
         return str(value)
@@ -174,6 +189,7 @@ class SDCWTIssuer:
         issuer: str = "https://issuer.example",
         subject: str = "https://subject.example",
         use_holder_thumbprint: bool = False,
+        vct: Optional[bytes] = None,
     ) -> tuple[bytes, str, list[bytes]]:
         """Issue an SD-CWT credential with selective disclosure.
 
@@ -203,20 +219,23 @@ class SDCWTIssuer:
             subject=subject,
             holder_public_key=holder_public_key,
             use_holder_thumbprint=use_holder_thumbprint,
+            vct=vct,
         )
 
-        # Convert EDN to redacted CBOR
-        redacted_claims, disclosures = edn_to_redacted_cbor(edn_string)
+        # Convert EDN to redacted CBOR. This already returns the *encoded*
+        # CWT Claims Set, which is exactly what the COSE_Sign1 payload bstr
+        # must contain -- encoding it a second time would nest a bstr inside
+        # the payload bstr and no other implementation could read it.
+        payload_cbor, disclosures = edn_to_redacted_cbor(edn_string)
 
         # Sign the SD-CWT
         issuer_thumbprint = CoseKeyThumbprint.compute(self.issuer_key, "sha256")
         protected_header = {
-            1: -7,  # ES256
-            16: "application/sd-cwt",  # typ
+            1: self.signer.algorithm,  # from the Issuer key, not assumed
+            16: 293,  # typ: CoAP content-format for application/sd-cwt
             4: issuer_thumbprint,  # kid
         }
 
-        payload_cbor = cbor_utils.encode(redacted_claims)
         sd_cwt = cose_sign1_sign(payload_cbor, self.signer, protected_header=protected_header)
 
         return sd_cwt, edn_string, disclosures
@@ -287,7 +306,7 @@ class SDCWTPresenter:
         disclosures: list[bytes],
         selected_disclosures: list[bytes],
         audience: str,
-        nonce: Optional[str] = None,
+        nonce: Optional[Union[str, bytes]] = None,
     ) -> bytes:
         """Create a presentation with selected claims disclosed.
 
@@ -296,7 +315,9 @@ class SDCWTPresenter:
             disclosures: All available disclosures from issuance
             selected_disclosures: Selected subset of disclosures to include
             audience: Intended audience for the presentation
-            nonce: Optional nonce for freshness
+            nonce: Optional nonce for freshness. The spec calls cnonce a bstr
+                supplied by the Verifier and opaque to the Holder, so bytes are
+                echoed as given; a str is encoded as UTF-8 for convenience.
 
         Returns:
             KBT (Key Binding Token) bytes containing the presentation
@@ -319,7 +340,14 @@ class SDCWTPresenter:
         holder_thumbprint = CoseKeyThumbprint.compute(self.holder_key, "sha256")
         current_time = int(time.time())
 
-        cnonce = nonce.encode() if nonce else None
+        # A Verifier's nonce is arbitrary bytes and need not be valid UTF-8,
+        # so bytes pass through untouched.
+        if nonce is None:
+            cnonce = None
+        elif isinstance(nonce, bytes):
+            cnonce = nonce
+        else:
+            cnonce = nonce.encode()
 
         kbt = create_sd_kbt(
             sd_cwt_with_disclosures=sd_cwt_with_disclosures,
@@ -393,7 +421,7 @@ class SDCWTPresenter:
 class SDCWTVerifier:
     """Simple API for verifying SD-CWT presentations."""
 
-    def __init__(self, public_key_resolver: Callable[[bytes], dict[int, Any]]) -> None:
+    def __init__(self, public_key_resolver: Callable[[Optional[bytes]], dict[int, Any]]) -> None:
         """Initialize with a public key resolver.
 
         Args:
@@ -407,7 +435,7 @@ class SDCWTVerifier:
         self,
         kbt: bytes,
         expected_audience: str,
-        holder_key_resolver: Optional[Callable[[bytes], dict[int, Any]]] = None,
+        holder_key_resolver: Optional[Callable[[Optional[bytes]], dict[int, Any]]] = None,
     ) -> tuple[bool, Optional[dict[str, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 
@@ -445,7 +473,8 @@ class SDCWTVerifier:
             if 13 not in protected_header:  # kcwt field
                 return False, None, False
 
-            sd_cwt_with_disclosures = protected_header[13]
+            # kcwt is the embedded #6.18 structure; normalize to bytes.
+            sd_cwt_with_disclosures = kcwt_to_bytes(protected_header[13])
 
             # The kcwt field contains the SD-CWT with disclosures
             # For verification, we need just the SD-CWT part

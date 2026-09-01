@@ -4,7 +4,7 @@ This module provides a unified interface for CBOR EDN operations,
 abstracting the underlying cbor-diag library implementation.
 """
 
-import cbor_diag  # type: ignore[import-untyped]
+import cbor_diag
 
 
 def cbor_to_diag(cbor_data: bytes) -> str:
@@ -16,7 +16,7 @@ def cbor_to_diag(cbor_data: bytes) -> str:
     Returns:
         Diagnostic notation string
     """
-    return cbor_diag.cbor2diag(cbor_data)  # type: ignore[no-any-return]
+    return cbor_diag.cbor2diag(cbor_data)
 
 
 def diag_to_cbor(diag_str: str) -> bytes:
@@ -28,7 +28,7 @@ def diag_to_cbor(diag_str: str) -> bytes:
     Returns:
         CBOR encoded bytes
     """
-    return cbor_diag.diag2cbor(diag_str)  # type: ignore[no-any-return]
+    return cbor_diag.diag2cbor(diag_str)
 
 
 def to_diagnostic(cbor_data: bytes) -> str:
