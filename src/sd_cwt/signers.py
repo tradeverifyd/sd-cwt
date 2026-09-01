@@ -7,7 +7,7 @@ This module provides safe signer classes that accept COSE key dictionaries:
 
 from typing import Any
 
-from .cose_sign1 import ES256Signer
+from .cose_sign1 import signer_for_cose_key
 
 
 class CredentialSigner:
@@ -21,21 +21,13 @@ class CredentialSigner:
 
         Raises:
             KeyError: If private key component is missing
-            ValueError: If key type is not supported
+            ValueError: If the key type or algorithm is not supported
         """
-        if -4 not in issuer_cose_key:
-            raise KeyError("Private key component (-4) missing from COSE key")
-
-        kty = issuer_cose_key.get(1)
-        if kty != 2:
-            raise ValueError(f"Only EC2 keys are supported, got kty: {kty}")
-
-        alg = issuer_cose_key.get(3)
-        if alg != -7:
-            raise ValueError(f"Only ES256 algorithm is supported, got alg: {alg}")
+        # The algorithm comes from the key, not from an assumption. ES256, ES384
+        # and ES512 are all supported; the spec's own Issuer key is P-384.
+        self._signer = signer_for_cose_key(issuer_cose_key)
 
         self.issuer_key = issuer_cose_key
-        self._signer = ES256Signer(issuer_cose_key[-4])
 
     def sign(self, message: bytes) -> bytes:
         """Sign a message using the issuer's private key.
@@ -46,16 +38,18 @@ class CredentialSigner:
         Returns:
             The signature bytes
         """
-        return self._signer.sign(message)
+        signature: bytes = self._signer.sign(message)
+        return signature
 
     @property
     def algorithm(self) -> int:
         """Get the COSE algorithm identifier.
 
         Returns:
-            COSE algorithm identifier (-7 for ES256)
+            COSE algorithm identifier (-7 ES256, -35 ES384, -36 ES512)
         """
-        return self._signer.algorithm
+        algorithm: int = self._signer.algorithm
+        return algorithm
 
 
 class PresentationSigner:
@@ -69,21 +63,13 @@ class PresentationSigner:
 
         Raises:
             KeyError: If private key component is missing
-            ValueError: If key type is not supported
+            ValueError: If the key type or algorithm is not supported
         """
-        if -4 not in holder_cose_key:
-            raise KeyError("Private key component (-4) missing from COSE key")
-
-        kty = holder_cose_key.get(1)
-        if kty != 2:
-            raise ValueError(f"Only EC2 keys are supported, got kty: {kty}")
-
-        alg = holder_cose_key.get(3)
-        if alg != -7:
-            raise ValueError(f"Only ES256 algorithm is supported, got alg: {alg}")
+        # The algorithm comes from the key, not from an assumption. ES256, ES384
+        # and ES512 are all supported; the spec's own Issuer key is P-384.
+        self._signer = signer_for_cose_key(holder_cose_key)
 
         self.holder_key = holder_cose_key
-        self._signer = ES256Signer(holder_cose_key[-4])
 
     def sign(self, message: bytes) -> bytes:
         """Sign a message using the holder's private key.
@@ -94,16 +80,18 @@ class PresentationSigner:
         Returns:
             The signature bytes
         """
-        return self._signer.sign(message)
+        signature: bytes = self._signer.sign(message)
+        return signature
 
     @property
     def algorithm(self) -> int:
         """Get the COSE algorithm identifier.
 
         Returns:
-            COSE algorithm identifier (-7 for ES256)
+            COSE algorithm identifier (-7 ES256, -35 ES384, -36 ES512)
         """
-        return self._signer.algorithm
+        algorithm: int = self._signer.algorithm
+        return algorithm
 
 
 def create_credential_signer(issuer_cose_key: dict[int, Any]) -> CredentialSigner:

@@ -176,9 +176,18 @@ class TestKeyBindingToken:
         # Verify protected header
         protected_header = cbor_utils.decode(kbt_cose_sign1[0])
         assert protected_header[1] == -7, "Algorithm should be ES256"
-        assert protected_header[16] == "application/kb+cwt", "Type should be kb+cwt"
+        # typ may be the CoAP content-format 294 or the media type string.
+        assert protected_header[16] in (
+            294,
+            "application/kb+cwt",
+        ), "Type should be kb+cwt"
         assert 13 in protected_header, "kcwt field should be present"
-        assert protected_header[13] == expected_sd_cwt, "kcwt should contain the original SD-CWT"
+        # kcwt carries the embedded #6.18 structure, so compare it re-encoded.
+        from sd_cwt.holder_binding import kcwt_to_bytes
+
+        assert (
+            kcwt_to_bytes(protected_header[13]) == expected_sd_cwt
+        ), "kcwt should contain the original SD-CWT"
 
         # Verify KBT payload
         kbt_payload = cbor_utils.decode(kbt_cose_sign1[2])

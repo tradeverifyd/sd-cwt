@@ -194,6 +194,54 @@ class ES256Signer:
         return -7  # ES256
 
 
+class ES384Signer:
+    """ECDSA P-384 SHA-384 signer implementation."""
+
+    def __init__(self, private_key_bytes: bytes):
+        """Initialize ES384 signer with private key.
+
+        Args:
+            private_key_bytes: The private key bytes (48 bytes for P-384)
+        """
+        private_value = int.from_bytes(private_key_bytes, byteorder="big")
+        self.private_key = ec.derive_private_key(private_value, ec.SECP384R1(), default_backend())
+
+    def sign(self, message: bytes) -> bytes:
+        """Sign a message with ES384."""
+        signature_der = self.private_key.sign(message, ec.ECDSA(hashes.SHA384()))
+        r, s = utils.decode_dss_signature(signature_der)
+        return r.to_bytes(48, byteorder="big") + s.to_bytes(48, byteorder="big")
+
+    @property
+    def algorithm(self) -> int:
+        """Get COSE algorithm identifier for ES384."""
+        return -35  # ES384
+
+
+class ES512Signer:
+    """ECDSA P-521 SHA-512 signer implementation."""
+
+    def __init__(self, private_key_bytes: bytes):
+        """Initialize ES512 signer with private key.
+
+        Args:
+            private_key_bytes: The private key bytes (66 bytes for P-521)
+        """
+        private_value = int.from_bytes(private_key_bytes, byteorder="big")
+        self.private_key = ec.derive_private_key(private_value, ec.SECP521R1(), default_backend())
+
+    def sign(self, message: bytes) -> bytes:
+        """Sign a message with ES512."""
+        signature_der = self.private_key.sign(message, ec.ECDSA(hashes.SHA512()))
+        r, s = utils.decode_dss_signature(signature_der)
+        return r.to_bytes(66, byteorder="big") + s.to_bytes(66, byteorder="big")
+
+    @property
+    def algorithm(self) -> int:
+        """Get COSE algorithm identifier for ES512."""
+        return -36  # ES512
+
+
 class ES256Verifier:
     """ECDSA P-256 SHA-256 verifier implementation."""
 
@@ -265,6 +313,131 @@ class ES384Verifier:
             return False
         except (ValueError, TypeError):
             return False
+
+
+class ES512Verifier:
+    """ECDSA P-521 SHA-512 verifier implementation."""
+
+    def __init__(self, public_key_x: bytes, public_key_y: bytes):
+        """Initialize ES512 verifier with public key coordinates.
+
+        Args:
+            public_key_x: X coordinate of public key (66 bytes)
+            public_key_y: Y coordinate of public key (66 bytes)
+        """
+        x = int.from_bytes(public_key_x, byteorder="big")
+        y = int.from_bytes(public_key_y, byteorder="big")
+
+        public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP521R1())
+        self.public_key = public_numbers.public_key(default_backend())
+
+    def verify(self, message: bytes, signature: bytes) -> bool:
+        """Verify a signature with ES512."""
+        try:
+            if len(signature) != 132:
+                return False
+
+            r = int.from_bytes(signature[:66], byteorder="big")
+            s = int.from_bytes(signature[66:], byteorder="big")
+            signature_der = utils.encode_dss_signature(r, s)
+
+            self.public_key.verify(signature_der, message, ec.ECDSA(hashes.SHA512()))
+            return True
+
+        except InvalidSignature:
+            return False
+        except (ValueError, TypeError):
+            return False
+
+
+# COSE algorithm identifier -> verifier class.
+_EC2_VERIFIERS: dict[int, Any] = {
+    -7: ES256Verifier,   # ES256 / P-256
+    -35: ES384Verifier,  # ES384 / P-384
+    -36: ES512Verifier,  # ES512 / P-521
+}
+
+
+# Fully-specified EC2 curves imply their signature algorithm.
+_CRV_TO_ALG: dict[int, int] = {1: -7, 2: -35, 3: -36}
+
+_EC2_SIGNERS: dict[int, Any] = {
+    -7: ES256Signer,   # ES256 / P-256
+    -35: ES384Signer,  # ES384 / P-384
+    -36: ES512Signer,  # ES512 / P-521
+}
+
+
+def signer_for_cose_key(cose_key: dict[int, Any]) -> Any:
+    """Build a signer for a COSE_Key, choosing the algorithm from the key.
+
+    The algorithm comes from the key's `alg` (3) parameter, falling back to the
+    curve (`crv`, -1) when the key does not carry one. Hardcoding ES256 makes it
+    impossible to issue with the P-384 Issuer key the spec's own examples use.
+
+    Args:
+        cose_key: COSE_Key map holding the private key at -4
+
+    Returns:
+        A signer exposing ``sign(message) -> bytes`` and an ``algorithm`` property
+
+    Raises:
+        KeyError: If the private key component is missing
+        ValueError: If the key type or algorithm is unsupported
+    """
+    if -4 not in cose_key:
+        raise KeyError("Private key component (-4) missing from COSE key")
+
+    kty = cose_key.get(1)
+    if kty != 2:
+        raise ValueError(f"Only EC2 keys are supported, got kty: {kty}")
+
+    alg = cose_key.get(3)
+    if alg is None:
+        # Fully-specified curves imply their algorithm: P-256/1, P-384/2, P-521/3
+        crv = cose_key.get(-1)
+        alg = _CRV_TO_ALG.get(crv) if isinstance(crv, int) else None
+    signer_cls = _EC2_SIGNERS.get(alg) if isinstance(alg, int) else None
+    if signer_cls is None:
+        raise ValueError(f"Unsupported COSE signature algorithm: {alg}")
+    return signer_cls(cose_key[-4])
+
+
+def verifier_for_alg(alg: int, public_key_x: bytes, public_key_y: bytes) -> Any:
+    """Build a verifier for a COSE algorithm identifier.
+
+    The signature algorithm comes from the `alg` protected header of the message
+    being verified. Assuming ES256 silently rejects every valid ES384 and ES512
+    message, so the algorithm must always be read rather than presumed.
+
+    Args:
+        alg: COSE algorithm identifier (-7, -35, or -36)
+        public_key_x: X coordinate of the public key
+        public_key_y: Y coordinate of the public key
+
+    Returns:
+        A verifier exposing ``verify(message, signature) -> bool``
+
+    Raises:
+        ValueError: If the algorithm is not a supported EC2 signature algorithm
+    """
+    verifier_cls = _EC2_VERIFIERS.get(alg)
+    if verifier_cls is None:
+        raise ValueError(f"Unsupported COSE signature algorithm: {alg}")
+    return verifier_cls(public_key_x, public_key_y)
+
+
+def verifier_for_cose_key(alg: int, cose_key: dict[int, Any]) -> Any:
+    """Build a verifier for a COSE algorithm from a COSE_Key map.
+
+    Args:
+        alg: COSE algorithm identifier from the protected header
+        cose_key: COSE_Key map, using -2 for x and -3 for y
+
+    Returns:
+        A verifier exposing ``verify(message, signature) -> bool``
+    """
+    return verifier_for_alg(alg, cose_key[-2], cose_key[-3])
 
 
 def generate_es256_key_pair() -> tuple[bytes, bytes, bytes]:

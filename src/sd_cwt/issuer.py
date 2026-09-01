@@ -1,20 +1,23 @@
 from . import cbor_utils
 
-"""SD-CWT Issuer implementation using EDN with redaction tags.
+"""Unfinished EDN-driven SD-CWT issuer prototype.
 
-This module implements SD-CWT (Selective Disclosure CBOR Web Token) issuance
-according to the latest draft specification from IETF SPICE Working Group.
-It uses CBOR Extended Diagnostic Notation (EDN) with redaction tags to
-specify which claims should be selectively disclosed.
+NOT the issuer to use. `sd_cwt.SDCWTIssuer` (in `simple_api`) is the working
+one; this module is an earlier sketch that shares its class name but never
+gained real signing. It is deliberately not exported from `sd_cwt/__init__.py`.
+
+`create_sd_cwt` raises rather than returning a token, because it previously
+returned a COSE_Sign1 carrying a literal placeholder in the signature slot, and
+an unsigned token that looks signed is worse than no token at all.
 """
 
-import hashlib
 import secrets
 from typing import Any, Optional
 
 from fido2.cose import CoseKey
 
 from . import edn_utils
+from .redaction import hash_disclosure as redaction_hash_disclosure
 
 
 class SDCWTIssuer:
@@ -95,22 +98,20 @@ class SDCWTIssuer:
         return cbor_utils.encode(disclosure_array)
 
     def hash_disclosure(self, disclosure: bytes) -> bytes:
-        """Hash a disclosure using the configured hash algorithm.
+        """Compute the Redacted Claim Hash of a disclosure.
+
+        Delegates to `redaction.hash_disclosure` so there is one definition of
+        the digest. This used to hash the bare `salted-entry` array encoding,
+        while the CDDL defines the input as `bstr .cbor salted-entry`, producing
+        digests no other implementation could match.
 
         Args:
-            disclosure: CBOR-encoded disclosure
+            disclosure: CBOR-encoded salted-entry (the bstr contents)
 
         Returns:
             Hash of the disclosure
         """
-        if self.hash_alg == "sha-256":
-            return hashlib.sha256(disclosure).digest()
-        elif self.hash_alg == "sha-384":
-            return hashlib.sha384(disclosure).digest()
-        elif self.hash_alg == "sha-512":
-            return hashlib.sha512(disclosure).digest()
-        else:
-            raise ValueError(f"Unsupported hash algorithm: {self.hash_alg}")
+        return redaction_hash_disclosure(disclosure, self.hash_alg)
 
     def create_sd_cwt(
         self, edn_claims: str, holder_key: Optional[CoseKey] = None
@@ -169,9 +170,6 @@ class SDCWTIssuer:
         }
         protected_header_cbor = cbor_utils.encode(protected_header)
 
-        # Unprotected header (empty)
-        unprotected_header: dict[str, Any] = {}
-
         # Payload (SD-CWT claims)
         payload = cbor_utils.encode(sd_cwt_claims)
 
@@ -183,19 +181,15 @@ class SDCWTIssuer:
             payload,  # Payload
         ]
 
-        cbor_utils.encode(sig_structure)  # This would be used for actual signing
+        cbor_utils.encode(sig_structure)  # what a real signer would sign
 
-        # Sign with ES256 (placeholder - would use actual signing)
-        # For now, create a dummy signature
-        signature = b"dummy_signature_placeholder" + b"\x00" * 37  # 64 bytes total
-
-        # Create COSE_Sign1 array
-        cose_sign1 = [protected_header_cbor, unprotected_header, payload, signature]
-
-        # Encode as CBOR with tag 18 (COSE_Sign1)
-        sd_cwt = cbor_utils.encode(cbor_utils.create_tag(18, cose_sign1))
-
-        return {"sd_cwt": sd_cwt, "disclosures": disclosures, "holder_key": holder_key}
+        raise NotImplementedError(
+            "sd_cwt.issuer.SDCWTIssuer cannot sign. It previously returned a "
+            "COSE_Sign1 whose signature was the literal bytes "
+            "b'dummy_signature_placeholder', which no verifier accepts and which "
+            "is indistinguishable from a real token to a caller that does not "
+            "check. Use sd_cwt.SDCWTIssuer from sd_cwt.simple_api instead."
+        )
 
     def create_presentation(
         self, sd_cwt: bytes, disclosures: list[bytes], selected_disclosures: list[int]
@@ -237,7 +231,7 @@ def create_example_edn_claims() -> str:
     edn_claims = """
     {
         1: "https://issuer.example",
-        2: "https://device.example",
+        2: "https://holder.example",
         4: 1725330600,
         5: 1725243840,
         6: 1725244200,

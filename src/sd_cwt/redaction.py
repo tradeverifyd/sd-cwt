@@ -130,21 +130,27 @@ def create_disclosure(salt: bytes, claim_name: Any, claim_value: Any) -> bytes:
 
 
 def hash_disclosure(disclosure: bytes, hash_alg: str = "sha-256") -> bytes:
-    """Hash a disclosure.
+    """Compute the Redacted Claim Hash of a disclosure.
+
+    The CDDL defines the hashed input as ``bstr-encoded-salted = bstr .cbor
+    salted-entry``, so the digest covers the CBOR *byte string* -- its header
+    included -- and not the bare ``salted-entry`` array encoding. Hashing the
+    array encoding alone produces digests no other implementation can match.
 
     Args:
-        disclosure: CBOR-encoded disclosure array
+        disclosure: CBOR-encoded salted-entry (the bstr contents)
         hash_alg: Hash algorithm name
 
     Returns:
         Hash digest bytes
     """
+    bstr_encoded_salted = cbor_utils.encode(disclosure)
     if hash_alg == "sha-256":
-        return hashlib.sha256(disclosure).digest()
+        return hashlib.sha256(bstr_encoded_salted).digest()
     elif hash_alg == "sha-384":
-        return hashlib.sha384(disclosure).digest()
+        return hashlib.sha384(bstr_encoded_salted).digest()
     elif hash_alg == "sha-512":
-        return hashlib.sha512(disclosure).digest()
+        return hashlib.sha512(bstr_encoded_salted).digest()
     else:
         raise ValueError(f"Unsupported hash algorithm: {hash_alg}")
 

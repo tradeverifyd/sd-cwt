@@ -85,11 +85,16 @@ def create_sd_kbt(
     if cnonce is not None:
         kbt_payload[39] = cnonce  # cnonce
 
+    # The CDDL declares `&(kcwt: 13) ^ => sd-cwt-issued`, and sd-cwt-issued is
+    # `#6.18([...])`. So kcwt carries the embedded COSE_Sign1 structure itself;
+    # passing the encoded bytes would nest it inside a bstr instead.
+    embedded_sd_cwt = cbor_utils.decode(sd_cwt_with_disclosures)
+
     # Protected header for SD-KBT
     protected_header = {
         1: holder_signer.algorithm,  # Algorithm
-        16: "application/kb+cwt",  # typ header parameter (REQUIRED)
-        TBD_KCWT: sd_cwt_with_disclosures,  # kcwt - contains the full SD-CWT
+        16: 294,  # typ: CoAP content-format for application/kb+cwt (REQUIRED)
+        TBD_KCWT: embedded_sd_cwt,  # kcwt - the full SD-CWT, as #6.18
     }
 
     # Add key ID if provided
@@ -199,7 +204,7 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
             return False, None
 
         typ_value = protected_header[16]
-        if typ_value != "application/kb+cwt":
+        if typ_value not in KBT_TYP_VALUES:
             return False, None
 
         if TBD_KCWT not in protected_header:  # kcwt
@@ -208,15 +213,27 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
         # Decode payload
         kbt_claims = cbor_utils.decode(payload)
 
-        # Check required claims
-        if 3 not in kbt_claims or 6 not in kbt_claims:  # aud and iat
+        # Section 8.1: iss and sub are implied by the cnf claim of the embedded
+        # SD-CWT, so repeating them in the KBT is superfluous and forbidden.
+        if 1 in kbt_claims or 2 in kbt_claims:
+            return False, None
+
+        # aud is REQUIRED.
+        if 3 not in kbt_claims:
+            return False, None
+
+        # Section 8.1: "The KBT payload MUST contain either the `iat` (issued
+        # at) claim, or the `cti` (CWT ID) claim." Requiring iat alone wrongly
+        # rejects a valid cti-only KBT.
+        if 6 not in kbt_claims and 7 not in kbt_claims:
             return False, None
 
         extracted_info = {
             "aud": kbt_claims[3],
-            "iat": kbt_claims[6],
+            "iat": kbt_claims.get(6),
+            "cti": kbt_claims.get(7),
             "cnonce": kbt_claims.get(39),  # Optional
-            "kcwt": protected_header[TBD_KCWT],
+            "kcwt": kcwt_to_bytes(protected_header[TBD_KCWT]),
             "kid": protected_header.get(4),  # Optional
         }
 
@@ -228,3 +245,26 @@ def validate_sd_kbt_structure(sd_kbt: bytes) -> tuple[bool, Optional[dict[str, A
 
 # Temporary constant until IANA registration
 TBD_KCWT = 13  # Placeholder for kcwt header parameter
+
+# The `typ` protected header may carry either the CoAP content-format integer or
+# the media type string; the spec says MUST be one of these, SHOULD be the
+# integer because its CBOR encoding is 3 bytes rather than 19.
+SD_CWT_TYP_VALUES = (293, "application/sd-cwt")
+KBT_TYP_VALUES = (294, "application/kb+cwt")
+
+
+def kcwt_to_bytes(kcwt: Any) -> bytes:
+    """Normalize a decoded `kcwt` header value to encoded SD-CWT bytes.
+
+    The CDDL requires the embedded `#6.18([...])` structure, but tolerating a
+    bstr-wrapped SD-CWT costs nothing and keeps older tokens readable.
+
+    Args:
+        kcwt: The decoded value of protected header 13
+
+    Returns:
+        The encoded SD-CWT (a tagged COSE_Sign1 message)
+    """
+    if isinstance(kcwt, bytes):
+        return kcwt
+    return cbor_utils.encode(kcwt)

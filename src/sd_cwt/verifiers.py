@@ -8,13 +8,13 @@ This module provides safe verifier classes for SD-CWT verification:
 from typing import Any, Callable, Optional, cast
 
 from . import cbor_utils
-from .cose_sign1 import ES256Verifier, cose_sign1_verify
+from .cose_sign1 import cose_sign1_verify, verifier_for_cose_key
 
 
 class CredentialVerifier:
     """Verifies SD-CWT credentials using a public key resolver."""
 
-    def __init__(self, public_key_resolver: Callable[[bytes], dict[int, Any]]):
+    def __init__(self, public_key_resolver: Callable[[Optional[bytes]], dict[int, Any]]):
         """Initialize credential verifier with a public key resolver.
 
         Args:
@@ -52,10 +52,9 @@ class CredentialVerifier:
 
             protected_header = cbor_utils.decode(protected_header_bytes)
 
-            # Extract key identifier (kid) from protected header (key 4)
+            # kid (key 4) is OPTIONAL in an SD-CWT protected header; the
+            # resolver is handed None when the Issuer did not include one.
             kid = protected_header.get(4)
-            if not kid:
-                return False, None
 
             # Resolve the public key using the key identifier
             try:
@@ -63,8 +62,11 @@ class CredentialVerifier:
             except ValueError:
                 return False, None
 
-            # Create verifier with resolved key
-            verifier = ES256Verifier(issuer_key[-2], issuer_key[-3])
+            # The signature algorithm comes from the protected header (key 1).
+            alg = protected_header.get(1)
+            if alg is None:
+                return False, None
+            verifier = verifier_for_cose_key(alg, issuer_key)
 
             # Verify signature
             is_valid, payload_bytes = cose_sign1_verify(sd_cwt, verifier)
@@ -83,7 +85,7 @@ class CredentialVerifier:
 class PresentationVerifier:
     """Verifies KBT presentations using a public key resolver."""
 
-    def __init__(self, public_key_resolver: Callable[[bytes], dict[int, Any]]):
+    def __init__(self, public_key_resolver: Callable[[Optional[bytes]], dict[int, Any]]):
         """Initialize presentation verifier with a public key resolver.
 
         Args:
@@ -128,10 +130,10 @@ class PresentationVerifier:
 
             protected_header = cbor_utils.decode(protected_header_bytes)
 
-            # Extract key identifier (kid) from protected header (key 4)
+            # An SD-KBT protected header carries alg, kcwt and typ; it has no
+            # kid, because the Holder key is pinned by the cnf claim of the
+            # embedded SD-CWT. Pass whatever kid is present, or None.
             kid = protected_header.get(4)
-            if not kid:
-                return False, None
 
             # Resolve the public key using the key identifier
             try:
@@ -139,8 +141,11 @@ class PresentationVerifier:
             except ValueError:
                 return False, None
 
-            # Create verifier with resolved key
-            verifier = ES256Verifier(holder_key[-2], holder_key[-3])
+            # The signature algorithm comes from the protected header (key 1).
+            alg = protected_header.get(1)
+            if alg is None:
+                return False, None
+            verifier = verifier_for_cose_key(alg, holder_key)
 
             # Verify signature
             is_valid, payload_bytes = cose_sign1_verify(kbt, verifier)
@@ -163,7 +168,7 @@ class PresentationVerifier:
 def get_presentation_verifier(
     credential: bytes,
     credential_verifier: CredentialVerifier,
-    holder_key_resolver: Optional[Callable[[bytes], dict[int, Any]]] = None,
+    holder_key_resolver: Optional[Callable[[Optional[bytes]], dict[int, Any]]] = None,
 ) -> Optional[PresentationVerifier]:
     """Extract presentation verifier from a verified credential.
 
@@ -206,9 +211,10 @@ def get_presentation_verifier(
 
         holder_thumbprint = CoseKeyThumbprint.compute(holder_key, "sha256")
 
-        def ckt_based_resolver(kid: bytes) -> dict[int, Any]:
-            # KBTs should use the key's computed thumbprint as kid
-            if kid == holder_thumbprint:
+        def ckt_based_resolver(kid: Optional[bytes]) -> dict[int, Any]:
+            # The cnf claim already pins exactly one Holder key, so there is
+            # nothing to look up. A kid, when present, must agree with it.
+            if kid is None or kid == holder_thumbprint:
                 return holder_key
             raise ValueError(f"Key not found: {kid.hex()}")
 
@@ -220,8 +226,9 @@ def get_presentation_verifier(
 
         holder_thumbprint = CoseKeyThumbprint.compute(holder_key, "sha256")
 
-        def single_key_resolver(kid: bytes) -> dict[int, Any]:
-            if kid == holder_thumbprint:
+        def single_key_resolver(kid: Optional[bytes]) -> dict[int, Any]:
+            # As above: cnf pins the key, so a missing kid is not an error.
+            if kid is None or kid == holder_thumbprint:
                 return cast(dict[int, Any], holder_key)
             raise ValueError(f"Key not found: {kid.hex()}")
 
