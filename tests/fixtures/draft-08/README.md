@@ -8,6 +8,18 @@ at `draft-ietf-spice-sd-cwt-08`.
 |---|---|
 | `issuer_cwt.cbor` | Issued SD-CWT, ES384 issuer key, five disclosures in `sd_claims` |
 | `kbt.cbor` | SD-KBT presentation, ES256 holder key, three disclosures selected |
+| `decoy.cbor` | Issued SD-CWT with two decoy disclosures among four |
+| `nested_issuer_cwt.cbor` | Issued SD-CWT with fifteen disclosures, nested |
+| `nested_cwt.cbor` | Narrowed nested SD-CWT, seven disclosures |
+| `nested_kbt.cbor` | Nested SD-KBT presentation |
+
+A decoy disclosure is a one-element array holding only a salt. Its digest sits
+in the payload like any other Redacted Claim Hash, so the count of redacted
+claims reveals nothing, and disclosing it reveals nothing either.
+
+Nested disclosures must be resolved iteratively: revealing one exposes Redacted
+Claim Hashes inside its value, which later disclosures then match. Checking all
+disclosures against only the outermost hashes fails on these files.
 
 The signing keys are in Appendix C of the draft: the Holder key is P-256, the
 Issuer key is P-384.
