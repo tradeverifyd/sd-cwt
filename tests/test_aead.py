@@ -288,3 +288,4 @@ class TestCrossImplementationFixtures:
         )
         assert valid and claims is not None
         assert claims[501] == "ABCD-123456"
+        assert claims[501] == "ABCD-123456"
