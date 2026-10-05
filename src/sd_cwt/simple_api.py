@@ -5,9 +5,16 @@ import time
 from typing import Any, Callable, Optional, Union
 
 from . import cbor_utils
+from .aead import (
+    SD_AEAD,
+    AeadKeyResolver,
+    KeyContext,
+    decrypt_sd_cwt_disclosures,
+    encrypt_sd_cwt_disclosures,
+)
 from .cose_sign1 import cose_sign1_sign
 from .holder_binding import create_cnf_claim, create_sd_kbt, kcwt_to_bytes
-from .redaction import edn_to_redacted_cbor
+from .redaction import edn_to_redacted_cbor, unmatched_disclosures
 from .signers import CredentialSigner, PresentationSigner
 from .thumbprint import CoseKeyThumbprint
 
@@ -190,6 +197,7 @@ class SDCWTIssuer:
         subject: str = "https://subject.example",
         use_holder_thumbprint: bool = False,
         vct: Optional[bytes] = None,
+        sd_aead: Optional[int] = None,
     ) -> tuple[bytes, str, list[bytes]]:
         """Issue an SD-CWT credential with selective disclosure.
 
@@ -200,6 +208,8 @@ class SDCWTIssuer:
             issuer: Issuer identifier
             subject: Subject identifier
             use_holder_thumbprint: Whether to use thumbprint in cnf claim
+            sd_aead: Optional IANA AEAD algorithm id for encrypted disclosures,
+                carried as sd_aead (172). Holders default to AEAD_AES_128_GCM.
 
         Returns:
             Tuple of (sd_cwt_bytes, disclosure_edn_string, disclosures)
@@ -235,6 +245,8 @@ class SDCWTIssuer:
             16: 293,  # typ: CoAP content-format for application/sd-cwt
             4: issuer_thumbprint,  # kid
         }
+        if sd_aead is not None:
+            protected_header[SD_AEAD] = sd_aead
 
         sd_cwt = cose_sign1_sign(payload_cbor, self.signer, protected_header=protected_header)
 
@@ -307,6 +319,9 @@ class SDCWTPresenter:
         selected_disclosures: list[bytes],
         audience: str,
         nonce: Optional[Union[str, bytes]] = None,
+        encrypted_disclosures: Optional[list[bytes]] = None,
+        aead_key: Optional[bytes] = None,
+        aead_key_context: Optional[KeyContext] = None,
     ) -> bytes:
         """Create a presentation with selected claims disclosed.
 
@@ -318,6 +333,12 @@ class SDCWTPresenter:
             nonce: Optional nonce for freshness. The spec calls cnonce a bstr
                 supplied by the Verifier and opaque to the Holder, so bytes are
                 echoed as given; a str is encoded as UTF-8 for convenience.
+            encrypted_disclosures: Disclosures to carry AEAD encrypted in
+                sd_aead_encrypted_claims (171) rather than in plaintext. They
+                need not also appear in selected_disclosures.
+            aead_key: Symmetric key shared with the Verifier that will decrypt
+                encrypted_disclosures. Required when they are given.
+            aead_key_context: Optional key context added to each encrypted entry
 
         Returns:
             KBT (Key Binding Token) bytes containing the presentation
@@ -332,8 +353,16 @@ class SDCWTPresenter:
             )
         """
         # Create SD-CWT with selected disclosures for presentation
-        sd_cwt_with_disclosures = self._create_sd_cwt_with_selected_disclosures(
-            sd_cwt, selected_disclosures
+        if encrypted_disclosures and aead_key is None:
+            raise ValueError("aead_key is required to encrypt disclosures")
+        to_encrypt = list(encrypted_disclosures or [])
+        plaintext = [d for d in selected_disclosures if d not in to_encrypt]
+        sd_cwt_with_disclosures = encrypt_sd_cwt_disclosures(
+            sd_cwt,
+            plaintext,
+            to_encrypt,
+            key=aead_key or b"",
+            key_context=aead_key_context,
         )
 
         # Create the KBT
@@ -360,63 +389,6 @@ class SDCWTPresenter:
 
         return kbt
 
-    def _create_sd_cwt_with_selected_disclosures(
-        self, original_sd_cwt: bytes, selected_disclosures: list[bytes]
-    ) -> bytes:
-        """Create SD-CWT with only selected disclosures in unprotected header.
-
-        Args:
-            original_sd_cwt: Original SD-CWT from issuer
-            selected_disclosures: Subset of disclosures to include
-
-        Returns:
-            Modified SD-CWT with selected disclosures
-        """
-        # Decode the original SD-CWT
-        cose_sign1 = cbor_utils.decode(original_sd_cwt)
-
-        # Handle CBOR tag wrapping
-        if cbor_utils.is_tag(cose_sign1):
-            cose_sign1_value = cbor_utils.get_tag_value(cose_sign1)
-        else:
-            cose_sign1_value = cose_sign1
-
-        if not isinstance(cose_sign1_value, list) or len(cose_sign1_value) != 4:
-            raise ValueError("Invalid COSE Sign1 structure")
-
-        # Extract components: [protected, unprotected, payload, signature]
-        protected_header_bytes = cose_sign1_value[0]
-        unprotected_header = cose_sign1_value[1]
-        payload_bytes = cose_sign1_value[2]
-        signature_bytes = cose_sign1_value[3]
-
-        # Create new unprotected header with selected disclosures
-        new_unprotected = unprotected_header.copy() if unprotected_header else {}
-
-        # Update sd_claims field (TBD1/17) with selected disclosures
-        sd_claims_key = 17  # Based on spec examples
-        new_unprotected[sd_claims_key] = selected_disclosures
-
-        # Reconstruct COSE Sign1 with modified unprotected header
-        new_cose_sign1_value = [
-            protected_header_bytes,
-            new_unprotected,
-            payload_bytes,
-            signature_bytes,
-        ]
-
-        # Re-wrap with tag if original was tagged
-        new_cose_sign1: Any
-        if cbor_utils.is_tag(cose_sign1):
-            new_cose_sign1 = cbor_utils.create_tag(
-                cbor_utils.get_tag_number(cose_sign1), new_cose_sign1_value
-            )
-        else:
-            new_cose_sign1 = new_cose_sign1_value
-
-        # Encode and return
-        return cbor_utils.encode(new_cose_sign1)
-
 
 class SDCWTVerifier:
     """Simple API for verifying SD-CWT presentations."""
@@ -436,13 +408,18 @@ class SDCWTVerifier:
         kbt: bytes,
         expected_audience: str,
         holder_key_resolver: Optional[Callable[[Optional[bytes]], dict[int, Any]]] = None,
-    ) -> tuple[bool, Optional[dict[str, Any]], bool]:
+        aead_key_resolver: Optional[AeadKeyResolver] = None,
+    ) -> tuple[bool, Optional[dict[Any, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 
         Args:
             kbt: Key Binding Token containing the presentation
             expected_audience: Expected audience value
             holder_key_resolver: Optional function to resolve holder keys
+            aead_key_resolver: Optional function mapping an aead-key-context
+                (or None) to the key, or candidate keys, for encrypted
+                disclosures. Entries it has no key for stay undisclosed; use
+                decrypt_sd_cwt_disclosures to obtain them for forwarding.
 
         Returns:
             Tuple of (is_valid, verified_claims, tags_absent)
@@ -497,6 +474,18 @@ class SDCWTVerifier:
             # Verify the KBT signature and audience
             kbt_valid, kbt_payload = presentation_verifier.verify(kbt, audience=expected_audience)
             if not kbt_valid or not kbt_payload:
+                return False, None, False
+
+            # Encrypted disclosures this Verifier can open are processed as if
+            # they had been in sd_claims.
+            sd_cwt_with_disclosures, _undecrypted = decrypt_sd_cwt_disclosures(
+                sd_cwt_with_disclosures, aead_key_resolver
+            )
+
+            # Every presented disclosure must match a Redacted Claim Hash;
+            # otherwise one could be lifted from another credential.
+            unprotected = cbor_utils.get_tag_value(cbor_utils.decode(sd_cwt_with_disclosures))[1]
+            if unmatched_disclosures(payload, unprotected.get(17, [])):
                 return False, None, False
 
             # Extract disclosures from the SD-CWT and reconstruct verified claims
@@ -557,7 +546,7 @@ class SDCWTVerifier:
 
     def _reconstruct_verified_claims(
         self, sd_cwt_with_disclosures: bytes, payload: dict[int, Any]
-    ) -> tuple[dict[str, Any], bool]:
+    ) -> tuple[dict[Any, Any], bool]:
         """Reconstruct verified claims from SD-CWT payload and disclosures.
 
         Args:
@@ -568,7 +557,8 @@ class SDCWTVerifier:
             Tuple of (clean_claims, tags_absent)
         """
         # First, extract the base claims from payload (same as before)
-        clean_claims, _ = self._extract_clean_claims(payload)
+        base_claims, _ = self._extract_clean_claims(payload)
+        clean_claims: dict[Any, Any] = dict(base_claims)
 
         # Extract disclosed claims from SD-CWT unprotected header
         try:
@@ -603,7 +593,8 @@ class SDCWTVerifier:
                                         clean_claims["sub"] = value
                                     elif key == 6:
                                         clean_claims["iat"] = value
-                                    # Add other numeric key mappings as needed
+                                    else:
+                                        clean_claims[key] = value
 
         except Exception:
             # If disclosure processing fails, just return the base claims

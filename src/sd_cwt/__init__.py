@@ -1,7 +1,17 @@
 """SD-CWT: SPICE SD-CWT specification implementation."""
 
 # Hide module imports
-from . import cose_keys, cose_sign1, redaction, resolvers, sd_cwt, signers, verifiers
+from . import aead, cose_keys, cose_sign1, redaction, resolvers, sd_cwt, signers, verifiers
+from .aead import (
+    AEAD_AES_128_GCM,
+    AEAD_AES_256_GCM,
+    AEAD_CHACHA20_POLY1305,
+    AeadDisclosureError,
+    decrypt_disclosure,
+    decrypt_sd_cwt_disclosures,
+    encrypt_disclosure,
+    encrypt_sd_cwt_disclosures,
+)
 from .cose_keys import (
     cose_key_from_dict,
     cose_key_generate,
@@ -20,6 +30,7 @@ from .redaction import (
     SecureSaltGenerator,
     SeededSaltGenerator,
     edn_to_redacted_cbor,
+    unmatched_disclosures,
 )
 from .resolvers import (
     cose_key_kid_resolver,
@@ -51,7 +62,7 @@ from .verifiers import (
     get_presentation_verifier,
 )
 
-del cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
+del aead, cose_keys, cose_sign1, redaction, sd_cwt, verifiers, signers, resolvers
 
 __version__ = "0.1.0"
 
@@ -72,6 +83,16 @@ __all__ = [
     "cose_key_thumbprint",
     # EDN Redaction
     "edn_to_redacted_cbor",
+    "unmatched_disclosures",
+    # AEAD encrypted disclosures
+    "AEAD_AES_128_GCM",
+    "AEAD_AES_256_GCM",
+    "AEAD_CHACHA20_POLY1305",
+    "AeadDisclosureError",
+    "encrypt_disclosure",
+    "decrypt_disclosure",
+    "encrypt_sd_cwt_disclosures",
+    "decrypt_sd_cwt_disclosures",
     # Salt generators for deterministic testing
     "SaltGenerator",
     "SecureSaltGenerator",

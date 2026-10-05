@@ -155,6 +155,57 @@ def hash_disclosure(disclosure: bytes, hash_alg: str = "sha-256") -> bytes:
         raise ValueError(f"Unsupported hash algorithm: {hash_alg}")
 
 
+def _collect_redacted_hashes(node: Any, found: set[bytes]) -> None:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == cbor_utils.create_simple_value(59):
+                found.update(value)
+            else:
+                _collect_redacted_hashes(value, found)
+    elif isinstance(node, list):
+        for item in node:
+            if cbor_utils.is_tag(item, 60):
+                found.add(item.value)
+            else:
+                _collect_redacted_hashes(item, found)
+
+
+def unmatched_disclosures(
+    payload: dict[Any, Any], disclosures: list[bytes], hash_alg: str = "sha-256"
+) -> list[bytes]:
+    """Return the disclosures that match no Redacted Claim Hash.
+
+    Resolution is iterative: revealing a disclosure can expose hashes nested
+    inside its value, which later disclosures then match.
+
+    Args:
+        payload: Decoded SD-CWT payload
+        disclosures: CBOR-encoded salted-entry values from sd_claims
+        hash_alg: Hash algorithm name
+
+    Returns:
+        The disclosures left unmatched; empty when all of them resolve
+    """
+    hashes: set[bytes] = set()
+    _collect_redacted_hashes(payload, hashes)
+
+    remaining = list(disclosures)
+    progress = True
+    while progress:
+        progress = False
+        still_unmatched = []
+        for disclosure in remaining:
+            if hash_disclosure(disclosure, hash_alg) in hashes:
+                progress = True
+                entry = cbor_utils.decode(disclosure)
+                if isinstance(entry, list) and len(entry) >= 2:
+                    _collect_redacted_hashes(entry[1], hashes)
+            else:
+                still_unmatched.append(disclosure)
+        remaining = still_unmatched
+    return remaining
+
+
 def find_redacted_claims(claims: dict[Any, Any]) -> list[tuple[list[Any], Any]]:
     """Recursively find all redacted claims in a claims dictionary.
 
