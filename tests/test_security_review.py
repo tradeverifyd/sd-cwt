@@ -18,7 +18,7 @@ AUD = "https://verifier.example/app"
 NOW = int(time.time())
 
 
-def token(claims=None, kbt=None, header=None, holder=HOLDER, unprotected=None):
+def token(claims=None, kbt=None, header=None, holder=HOLDER, unprotected=None, kbt_header=None):
     payload = {
         1: "issuer",
         2: "holder",
@@ -36,7 +36,9 @@ def token(claims=None, kbt=None, header=None, holder=HOLDER, unprotected=None):
     kp = {3: AUD, 6: NOW}
     kp.update(kbt or {})
     return cose_sign1_sign(
-        cbor.encode(kp), PresentationSigner(holder), protected_header={16: 294, 13: cbor.decode(sd)}
+        cbor.encode(kp),
+        PresentationSigner(holder),
+        protected_header={16: 294, 13: cbor.decode(sd), **(kbt_header or {})},
     )
 
 
@@ -137,3 +139,19 @@ def test_failures_do_not_log_resolver_secrets(capsys):
 def test_kbt_issuance_must_precede_issuer_expiry_even_with_leeway():
     assert verify(token({4: NOW}, {6: NOW - 1}), now=NOW, leeway=10)
     assert not verify(token({4: NOW}, {6: NOW}), now=NOW, leeway=10)
+
+
+@pytest.mark.parametrize("typ", [293, "application/sd-cwt", "application/example+sd-cwt"])
+def test_spec_credential_types(typ):
+    assert verify(token(header={16: typ}))
+
+
+@pytest.mark.parametrize(
+    "typ", ["application/sd+cwt", "application/+sd-cwt", "not a media type+sd-cwt"]
+)
+def test_reject_incorrect_credential_types(typ):
+    assert not verify(token(header={16: typ}))
+
+
+def test_kbt_cannot_carry_cwt_claims_header():
+    assert not verify(token(kbt_header={15: {3: AUD}}))

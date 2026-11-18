@@ -167,7 +167,7 @@ class TestEDNAPIComprehensive:
         issuer_thumbprint = CoseKeyThumbprint.compute(issuer_key_dict, "sha256")
         protected_header = {
             1: -7,  # ES256
-            16: "application/sd+cwt",  # typ
+            16: "application/sd-cwt",  # typ
             4: issuer_thumbprint,  # kid
         }
 

@@ -459,6 +459,9 @@ class SDCWTVerifier:
             protected_header_bytes = kbt_value[0]
             protected_header = cbor_utils.decode(protected_header_bytes)
 
+            if 15 in protected_header:  # CWT Claims is forbidden in KBT headers
+                return False, None, False
+
             if 13 not in protected_header:  # kcwt field
                 return False, None, False
 
@@ -498,7 +501,9 @@ class SDCWTVerifier:
             issuer_headers = cbor_utils.decode(
                 cbor_utils.get_tag_value(cbor_utils.decode(sd_cwt))[0]
             )
-            if issuer_headers.get(16) not in (293, "application/sd+cwt"):
+            from .verification_policy import is_sd_cwt_typ
+
+            if not is_sd_cwt_typ(issuer_headers.get(16)):
                 return False, None, False
             if protected_header.get(16) not in (294, "application/kb+cwt"):
                 return False, None, False

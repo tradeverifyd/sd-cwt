@@ -1,6 +1,7 @@
 """Checks on authenticated, reconstructed CWT claims (RFC 8392 and draft-08)."""
 
 import math
+import re
 import time
 from typing import Any, Optional
 
@@ -76,3 +77,18 @@ def validate_presentation_claims(
         not isinstance(expected_nonce, bytes) or presentation.get(39) != expected_nonce
     ):
         raise ValueError("nonce mismatch")
+
+
+def is_sd_cwt_typ(value: Any) -> bool:
+    """Draft section 4: content-format, media type, or a +sd-cwt subtype."""
+    return (
+        value == 293
+        or value == "application/sd-cwt"
+        or (
+            isinstance(value, str)
+            and re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\+sd-cwt", value
+            )
+            is not None
+        )
+    )
