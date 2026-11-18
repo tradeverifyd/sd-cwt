@@ -49,7 +49,7 @@ choose trusted issuers, required claims, intended audience, and replay policy.
 
 ## Validation
 
-- Full Python suite: **209 passed**, including a fresh temporary environment
+- Full Python suite: **210 passed**, including a fresh temporary environment
   installed from the locally resolved development dependency graph.
 - Cross-implementation profiles: **316/316 passed** with the security changes
   and explicit historical clocks (Python/JavaScript, plus supported Rust checks).
@@ -64,13 +64,26 @@ resolved production graph (`sd-cwt`, cbor-diag, cbor2, cffi, cryptography, fido2
 pycparser, PyYAML, regex, zcbor). This is advisory matching, not a reachability
 or cryptographic audit.
 
-The broad development environment initially had 50 advisories across seven
-packages. Re-resolving the ignored local `uv.lock` and testing in a fresh
-environment reduced this to 13 advisories in development-only `filelock` 3.32.7,
-required by safety/python-discovery/virtualenv through the dev extra. Those
-constraints still require follow-up; this PR does **not** claim a clean dev-tool
-audit or publish the repository's intentionally ignored lockfile. No production
-dependency update was required by the observed audit.
+The broad development environment initially had 50 advisories. Safety pinned
+`filelock<4`, preventing installation of the available fixes. Replaced that dev
+tool with `pip-audit` and constrained filelock to >=4.2.1 on Python >=3.11.
+The resolved Python 3.13 environment now reports **zero known advisories**, including
+development dependencies. CI runs pip-audit as a required check instead of hiding
+its exit status. The ignored local lockfile is still not published. This result
+does not certify older Python development environments: the fixed filelock line
+requires Python >=3.11, and the new audit tool requires Python >=3.10.
+
+Follow-up: full Black, Ruff, and MyPy checks pass. Reconstruction annotations were
+corrected, and MyPy's target moved to its minimum supported Python 3.10 (the
+runtime metadata remains unchanged). A signed regression now enforces KBT
+`iat < credential exp` even with clock leeway. Leeway changes wall-clock checks,
+not the logical relationship between signed claims.
+
+The expanded cross-implementation experiment adds Rust Holder nested/array
+production, typed thumbprint contexts, AES-256, and partial parent/child encryption.
+Unlike the narrower 316-case run, it exposes non-default algorithm incompatibility:
+Rust reads/writes header 172 in unprotected headers. No production compatibility
+fallback was added to weaken protected-header or duplicate-header validation.
 
 Not established by this review: resistance to exhaustive parser fuzzing or
 resource-exhaustion attacks, constant-time behavior of every dependency,

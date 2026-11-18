@@ -441,7 +441,7 @@ def reconstruct_claims(payload: dict[Any, Any], disclosures: list[bytes]) -> dic
     redacted_key = cbor_utils.create_simple_value(59)
     omitted = object()
 
-    def take(digest: bytes, length: int):
+    def take(digest: bytes, length: int) -> Optional[list[Any]]:
         if not isinstance(digest, bytes):
             raise ValueError("redacted claim hash must be a byte string")
         if digest not in lookup:
@@ -454,7 +454,7 @@ def reconstruct_claims(payload: dict[Any, Any], disclosures: list[bytes]) -> dic
         used.add(digest)
         return disclosure if len(disclosure) != 1 else None
 
-    def walk(node: Any, depth: int = 0, array_element: bool = False):
+    def walk(node: Any, depth: int = 0, array_element: bool = False) -> Any:
         if depth > 16:
             raise ValueError("nested disclosures exceed maximum depth of 16")
         if isinstance(node, dict):
@@ -471,12 +471,12 @@ def reconstruct_claims(payload: dict[Any, Any], disclosures: list[bytes]) -> dic
                     result[key] = walk(value, depth + 1)
             return result
         if isinstance(node, list):
-            result = []
+            elements: list[Any] = []
             for value in node:
                 reconstructed = walk(value, depth, array_element=True)
                 if reconstructed is not omitted:
-                    result.append(reconstructed)
-            return result
+                    elements.append(reconstructed)
+            return elements
         if cbor_utils.is_tag(node):
             number = cbor_utils.get_tag_number(node)
             value = cbor_utils.get_tag_value(node)
@@ -489,6 +489,8 @@ def reconstruct_claims(payload: dict[Any, Any], disclosures: list[bytes]) -> dic
         return node
 
     result = walk(payload)
+    if not isinstance(result, dict):
+        raise ValueError("claims must be a map")
     if used != lookup.keys():
         raise ValueError("disclosures match no Redacted Claim Hash")
     return result

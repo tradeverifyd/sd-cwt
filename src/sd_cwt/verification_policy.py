@@ -59,7 +59,7 @@ def validate_presentation_claims(
         (5, 5, "min"),
         (6, 6, "min"),
         (6, 5, "min"),
-        (6, 4, "max"),
+        (6, 4, "strictmax"),
         (5, 4, "strictmax"),
     ]:
         if p in presentation and c in credential:

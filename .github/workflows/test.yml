@@ -98,12 +98,11 @@ jobs:
         run: |
           uv venv
           uv pip install -e ".[dev]"
-          uv pip install bandit safety
+          uv pip install bandit pip-audit
 
       - name: Run Bandit
         run: uv run bandit -r src -f json -o bandit-report.json
         continue-on-error: true
 
-      - name: Run Safety check
-        run: uv run safety check --json
-        continue-on-error: true
+      - name: Audit installed dependencies
+        run: uv run pip-audit --local

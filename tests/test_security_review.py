@@ -96,7 +96,7 @@ def test_duplicate_protected_unprotected_parameter():
 
 
 def test_expiry_boundary_and_explicit_clock():
-    t = token({4: NOW})
+    t = token({4: NOW}, {6: NOW - 1})
     assert not verify(t, now=NOW)
     assert verify(t, now=NOW, leeway=1)
     assert verify(t, now=NOW - 1, leeway=1)
@@ -132,3 +132,8 @@ def test_failures_do_not_log_resolver_secrets(capsys):
 
     assert not SDCWTVerifier(failing).verify_presentation(token(), AUD)[0]
     assert capsys.readouterr() == ("", "")
+
+
+def test_kbt_issuance_must_precede_issuer_expiry_even_with_leeway():
+    assert verify(token({4: NOW}, {6: NOW - 1}), now=NOW, leeway=10)
+    assert not verify(token({4: NOW}, {6: NOW}), now=NOW, leeway=10)
