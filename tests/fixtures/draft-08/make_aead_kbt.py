@@ -49,6 +49,7 @@ def main() -> None:
     with mock.patch.object(aead.os, "urandom", lambda n: AEAD_NONCE):
         kbt = SDCWTPresenter(holder_key()).create_presentation(
             sd_cwt=issued,
+            issued_at=1725244300,
             disclosures=disclosures,
             selected_disclosures=plaintext,
             audience=AUDIENCE,

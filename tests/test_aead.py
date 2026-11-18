@@ -2,6 +2,7 @@
 
 import pytest
 
+from fixture_clock import issuance_time, verify_fixture
 from sd_cwt import (
     AEAD_AES_128_GCM,
     AEAD_AES_256_GCM,
@@ -204,6 +205,7 @@ class TestPresentation:
     def _present(self, issued, holder_key, disclosures, **kwargs) -> bytes:
         return SDCWTPresenter(holder_key).create_presentation(
             sd_cwt=issued,
+            issued_at=issuance_time(issued),
             disclosures=list(disclosures.values()),
             selected_disclosures=[disclosures[1549560720], disclosures["region"]],
             audience=AUDIENCE,
@@ -219,32 +221,29 @@ class TestPresentation:
 
     def test_verifier_with_the_key_sees_the_claim(self, issued, holder_key, disclosures):
         kbt = self._present(issued, holder_key, disclosures)
-        valid, claims, _ = _verifier().verify_presentation(
-            kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY
-        )
+        valid, claims, _ = verify_fixture(kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY)
         assert valid and claims is not None
         assert claims[501] == "ABCD-123456"
         assert claims[501] == "ABCD-123456"
-        assert claims["region"] == "ca"
+        assert claims[503]["region"] == "ca"
 
     def test_verifier_without_the_key_still_verifies(self, issued, holder_key, disclosures):
         kbt = self._present(issued, holder_key, disclosures)
-        valid, claims, _ = _verifier().verify_presentation(kbt, AUDIENCE)
+        valid, claims, _ = verify_fixture(kbt, AUDIENCE)
         assert valid and claims is not None
         assert 501 not in claims
-        assert claims["region"] == "ca"
+        assert claims[503]["region"] == "ca"
 
     def test_wrong_key_rejects_the_presentation(self, issued, holder_key, disclosures):
         kbt = self._present(issued, holder_key, disclosures)
-        valid, _claims, _ = _verifier().verify_presentation(
-            kbt, AUDIENCE, aead_key_resolver=lambda ctx: OTHER_KEY
-        )
+        valid, _claims, _ = verify_fixture(kbt, AUDIENCE, aead_key_resolver=lambda ctx: OTHER_KEY)
         assert not valid
 
     def test_requires_a_key_to_encrypt(self, issued, holder_key, disclosures):
         with pytest.raises(ValueError, match="aead_key"):
             SDCWTPresenter(holder_key).create_presentation(
                 sd_cwt=issued,
+                issued_at=issuance_time(issued),
                 disclosures=[],
                 selected_disclosures=[],
                 audience=AUDIENCE,
@@ -257,17 +256,16 @@ class TestPresentation:
         foreign = cbor_utils.encode([bytes(16), "forged", 501])
         kbt = SDCWTPresenter(holder_key).create_presentation(
             sd_cwt=issued,
+            issued_at=issuance_time(issued),
             disclosures=[],
             selected_disclosures=[],
             audience=AUDIENCE,
             encrypted_disclosures=[foreign],
             aead_key=DRAFT_KEY,
         )
-        valid, _claims, _ = _verifier().verify_presentation(
-            kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY
-        )
+        valid, _claims, _ = verify_fixture(kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY)
         assert not valid
-        valid, _claims, _ = _verifier().verify_presentation(kbt, AUDIENCE)
+        valid, _claims, _ = verify_fixture(kbt, AUDIENCE)
         assert valid, "a Verifier that cannot decrypt cannot detect it, and forwards it"
 
 
@@ -283,9 +281,108 @@ class TestCrossImplementationFixtures:
         entries = _embedded_unprotected(kbt)[171]
         assert entries == [DRAFT_ENTRY], "must match the draft's aead-claim-array.edn"
 
-        valid, claims, _ = _verifier().verify_presentation(
-            kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY
-        )
+        valid, claims, _ = verify_fixture(kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY)
         assert valid and claims is not None
         assert claims[501] == "ABCD-123456"
         assert claims[501] == "ABCD-123456"
+
+
+@pytest.mark.parametrize("plaintext_duplicate", [False, True])
+def test_duplicate_decrypted_disclosures_reject(issued, holder_key, plaintext_duplicate):
+    from sd_cwt.holder_binding import create_sd_kbt
+    from sd_cwt.signers import PresentationSigner
+
+    # Different nonces prove we compare recovered disclosures, not ciphertexts.
+    token = encrypt_sd_cwt_disclosures(
+        issued,
+        [FIRST_DISCLOSURE] if plaintext_duplicate else [],
+        [FIRST_DISCLOSURE] if plaintext_duplicate else [FIRST_DISCLOSURE, FIRST_DISCLOSURE],
+        DRAFT_KEY,
+    )
+    with pytest.raises(AeadDisclosureError, match="duplicate disclosure"):
+        decrypt_sd_cwt_disclosures(token, lambda ctx: DRAFT_KEY)
+
+    kbt = create_sd_kbt(
+        sd_cwt_with_disclosures=token,
+        holder_signer=PresentationSigner(holder_key),
+        audience=AUDIENCE,
+        issued_at=issuance_time(issued),
+    )
+    valid, _, _ = verify_fixture(kbt, AUDIENCE, aead_key_resolver=lambda ctx: DRAFT_KEY)
+    assert not valid
+    # Without the key a duplicate cannot be detected; forwarding is still valid.
+    valid, _, _ = verify_fixture(kbt, AUDIENCE)
+    assert valid
+
+
+class TestNestedCrossImplementation:
+    """Generated by the draft repository's interop/run_profiles.py, JS Holder."""
+
+    @pytest.mark.parametrize("with_key", [False, True])
+    def test_nested_and_array_disclosures_keep_their_locations(self, with_key):
+        token = (FIXTURES / "nested_aead.js.cbor").read_bytes()
+        valid, claims, clean = verify_fixture(
+            token, AUDIENCE, aead_key_resolver=(lambda ctx: DRAFT_KEY) if with_key else None
+        )
+        expected = {
+            "iss": "https://issuer.example",
+            "sub": "https://holder.example",
+            500: True,
+            "items": ["public"],
+        }
+        if with_key:
+            expected["profile"] = {"public": True, "city": "private city"}
+            expected["items"].append({"kind": "secret"})
+        assert valid and clean
+        assert claims == expected
+
+    @pytest.mark.parametrize("recipient", ["both", "a", "b", "neither"])
+    def test_context_routing_and_partial_decryption(self, recipient):
+        token = (FIXTURES / "two_key_aead.js.cbor").read_bytes()
+        mapping = {}
+        if recipient in ("both", "a"):
+            mapping[bytes(range(32))] = DRAFT_KEY
+        if recipient in ("both", "b"):
+            mapping["recipient-b"] = bytes(range(16))
+        valid, claims, clean = verify_fixture(token, AUDIENCE, aead_key_resolver=mapping.get)
+        assert valid and clean
+        assert (501 in claims) == (recipient in ("both", "a"))
+        assert ("region" in claims[503]) == (recipient in ("both", "b"))
+        assert claims[503]["postal_code"] == "94188"
+        assert claims[502] == [1549560720, 1612560720, 1674004740]
+
+
+@pytest.mark.parametrize(
+    "plaintext",
+    [
+        b"\xff",  # invalid CBOR
+        cbor_utils.encode(FIRST_DISCLOSURE) + b"\x00",  # trailing item
+        b"\x59\x00\x21" + FIRST_DISCLOSURE,  # non-preferred bstr length
+        b"\x5f" + cbor_utils.encode(FIRST_DISCLOSURE) + b"\xff",  # indefinite bstr
+    ],
+)
+def test_authenticated_but_malformed_plaintext_is_rejected(plaintext):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = bytes(12)
+    ciphertext = AESGCM(DRAFT_KEY).encrypt(nonce, plaintext, b"")
+    with pytest.raises(AeadDisclosureError):
+        decrypt_disclosure([nonce, ciphertext[:-16], ciphertext[-16:]], DRAFT_KEY)
+
+
+def test_nonempty_aad_is_not_accepted():
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = bytes(12)
+    ciphertext = AESGCM(DRAFT_KEY).encrypt(nonce, cbor_utils.encode(FIRST_DISCLOSURE), b"wrong aad")
+    with pytest.raises(AeadDisclosureError, match="authentication"):
+        decrypt_disclosure([nonce, ciphertext[:-16], ciphertext[-16:]], DRAFT_KEY)
+
+
+def test_no_encrypted_header_passthrough(issued):
+    assert decrypt_sd_cwt_disclosures(issued, None) == (issued, [])
+
+
+def test_fixed_nonce_count_must_match(issued):
+    with pytest.raises(ValueError, match="one entry"):
+        encrypt_sd_cwt_disclosures(issued, [], [FIRST_DISCLOSURE], DRAFT_KEY, nonces=[])

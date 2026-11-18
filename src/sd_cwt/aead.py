@@ -285,7 +285,12 @@ def decrypt_sd_cwt_disclosures(
             raise AeadDisclosureError("encrypted disclosure failed authentication")
 
     if decrypted:
-        unprotected[SD_CLAIMS] = list(unprotected.get(SD_CLAIMS, [])) + decrypted
+        combined = list(unprotected.get(SD_CLAIMS, [])) + decrypted
+        # Each disclosure consumes one Redacted Claim Hash. Do not silently
+        # collapse duplicates when building the reconstruction lookup.
+        if len(set(combined)) != len(combined):
+            raise AeadDisclosureError("duplicate disclosure after AEAD decryption")
+        unprotected[SD_CLAIMS] = combined
     if remaining:
         unprotected[SD_AEAD_ENCRYPTED_CLAIMS] = remaining
     else:

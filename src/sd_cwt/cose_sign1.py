@@ -142,7 +142,31 @@ def cose_sign1_verify(
         if not isinstance(cose_sign1, list) or len(cose_sign1) != 4:
             return False, None
 
-        protected_header_bytes, _, payload, signature = cose_sign1
+        protected_header_bytes, unprotected, payload, signature = cose_sign1
+        if not all(
+            isinstance(v, bytes) for v in (protected_header_bytes, payload, signature)
+        ) or not isinstance(unprotected, dict):
+            return False, None
+        protected = cbor_utils.decode(protected_header_bytes) if protected_header_bytes else {}
+        if (
+            not isinstance(protected, dict)
+            or protected.keys() & unprotected.keys()
+            or 2 in unprotected
+        ):
+            return False, None
+        if 2 in protected:
+            critical = protected[2]
+            # This generic verifier only understands algorithm semantics.
+            if (
+                not isinstance(critical, list)
+                or not critical
+                or any(
+                    type(label) is not int or label != 1 or label not in protected
+                    for label in critical
+                )
+                or len(set(critical)) != len(critical)
+            ):
+                return False, None
 
         # Recreate Sig_structure for verification
         sig_structure = [

@@ -192,6 +192,7 @@ class TestEDNAPIComprehensive:
         # Create presentation
         kbt = presenter.create_presentation(
             sd_cwt=sd_cwt,
+            issued_at=1725244300,
             disclosures=disclosures,
             selected_disclosures=selected_disclosures,
             audience="https://customs.us.example",
@@ -205,7 +206,7 @@ class TestEDNAPIComprehensive:
 
         verifier = SDCWTVerifier(issuer_resolver)
         is_valid, verified_claims, tags_absent = verifier.verify_presentation(
-            kbt=kbt, expected_audience="https://customs.us.example"
+            kbt=kbt, expected_audience="https://customs.us.example", now=1725244300
         )
 
         # Step 11: Validate verification results

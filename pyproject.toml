@@ -48,7 +48,8 @@ dev = [
     # Development tools
     "ipython>=8.0.0",
     "bandit>=1.7.0",  # Security linting
-    "safety>=2.3.0",  # Dependency security checks
+    "pip-audit>=2.10.0; python_version >= '3.10'",  # Dependency advisory checks
+    "filelock>=4.2.1; python_version >= '3.11'",  # Fixed dev-tool transitive dependency
 ]
 
 [project.urls]
@@ -93,7 +94,7 @@ line-length = 100
 target-version = ['py39']
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
