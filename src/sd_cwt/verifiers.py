@@ -5,6 +5,7 @@ This module provides safe verifier classes for SD-CWT verification:
 - PresentationVerifier: Verifies KBT presentations using holder's key
 """
 
+import hmac
 from typing import Any, Callable, Optional, cast
 
 from . import cbor_utils
@@ -188,7 +189,7 @@ def get_presentation_verifier(
 
     # Extract cnf claim containing holder key reference
     cnf_claim = payload.get(8)  # cnf claim
-    if not cnf_claim:
+    if not isinstance(cnf_claim, dict) or (1 in cnf_claim) == (3 in cnf_claim):
         return None
 
     # Check if cnf contains a key thumbprint (key 3) for resolution
@@ -209,7 +210,14 @@ def get_presentation_verifier(
         # Create a resolver for KBT verification using the resolved key's thumbprint
         from .thumbprint import CoseKeyThumbprint
 
-        holder_thumbprint = CoseKeyThumbprint.compute(holder_key, "sha256")
+        if not isinstance(holder_ckt, bytes):
+            return None
+        hash_name = {32: "sha256", 48: "sha384", 64: "sha512"}.get(len(holder_ckt))
+        if hash_name is None:
+            return None
+        holder_thumbprint = CoseKeyThumbprint.compute(holder_key, hash_name)
+        if not hmac.compare_digest(holder_thumbprint, holder_ckt):
+            return None
 
         def ckt_based_resolver(kid: Optional[bytes]) -> dict[int, Any]:
             # The cnf claim already pins exactly one Holder key, so there is

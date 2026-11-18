@@ -14,7 +14,7 @@ from .aead import (
 )
 from .cose_sign1 import cose_sign1_sign
 from .holder_binding import create_cnf_claim, create_sd_kbt, kcwt_to_bytes
-from .redaction import edn_to_redacted_cbor, unmatched_disclosures
+from .redaction import edn_to_redacted_cbor, reconstruct_claims, unmatched_disclosures
 from .signers import CredentialSigner, PresentationSigner
 from .thumbprint import CoseKeyThumbprint
 
@@ -322,6 +322,7 @@ class SDCWTPresenter:
         encrypted_disclosures: Optional[list[bytes]] = None,
         aead_key: Optional[bytes] = None,
         aead_key_context: Optional[KeyContext] = None,
+        issued_at: Optional[int] = None,
     ) -> bytes:
         """Create a presentation with selected claims disclosed.
 
@@ -339,6 +340,8 @@ class SDCWTPresenter:
             aead_key: Symmetric key shared with the Verifier that will decrypt
                 encrypted_disclosures. Required when they are given.
             aead_key_context: Optional key context added to each encrypted entry
+            issued_at: Explicit KBT issuance time for controlled clocks/test vectors.
+                Defaults to the current time; cannot extend the credential validity.
 
         Returns:
             KBT (Key Binding Token) bytes containing the presentation
@@ -367,7 +370,7 @@ class SDCWTPresenter:
 
         # Create the KBT
         holder_thumbprint = CoseKeyThumbprint.compute(self.holder_key, "sha256")
-        current_time = int(time.time())
+        current_time = int(time.time()) if issued_at is None else issued_at
 
         # A Verifier's nonce is arbitrary bytes and need not be valid UTF-8,
         # so bytes pass through untouched.
@@ -409,12 +412,21 @@ class SDCWTVerifier:
         expected_audience: str,
         holder_key_resolver: Optional[Callable[[Optional[bytes]], dict[int, Any]]] = None,
         aead_key_resolver: Optional[AeadKeyResolver] = None,
+        *,
+        now: Optional[float] = None,
+        leeway: float = 0,
+        expected_nonce: Optional[bytes] = None,
     ) -> tuple[bool, Optional[dict[Any, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 
         Args:
             kbt: Key Binding Token containing the presentation
             expected_audience: Expected audience value
+            now: Verification time in epoch seconds; defaults to the system clock.
+                Set explicitly only for a trusted clock or historical fixtures.
+            leeway: Nonnegative finite clock skew in seconds (default zero).
+            expected_nonce: Required verifier challenge, if the application uses one.
+                Applications must additionally enforce replay/cti state as appropriate.
             holder_key_resolver: Optional function to resolve holder keys
             aead_key_resolver: Optional function mapping an aead-key-context
                 (or None) to the key, or candidate keys, for encrypted
@@ -482,11 +494,29 @@ class SDCWTVerifier:
                 sd_cwt_with_disclosures, aead_key_resolver
             )
 
+            # Policy must inspect reconstructed claims: aud/exp may be disclosed.
+            issuer_headers = cbor_utils.decode(
+                cbor_utils.get_tag_value(cbor_utils.decode(sd_cwt))[0]
+            )
+            if issuer_headers.get(16) not in (293, "application/sd+cwt"):
+                return False, None, False
+            if protected_header.get(16) not in (294, "application/kb+cwt"):
+                return False, None, False
+            if issuer_headers.get(170, -16) != -16:
+                return False, None, False  # this API currently supports SHA-256
+
             # Every presented disclosure must match a Redacted Claim Hash;
             # otherwise one could be lifted from another credential.
             unprotected = cbor_utils.get_tag_value(cbor_utils.decode(sd_cwt_with_disclosures))[1]
             if unmatched_disclosures(payload, unprotected.get(17, [])):
                 return False, None, False
+
+            from .verification_policy import validate_presentation_claims
+
+            reconstructed = reconstruct_claims(payload, unprotected.get(17, []))
+            validate_presentation_claims(
+                reconstructed, kbt_payload, expected_audience, now, leeway, expected_nonce
+            )
 
             # Extract disclosures from the SD-CWT and reconstruct verified claims
             clean_claims, tags_absent = self._reconstruct_verified_claims(
@@ -495,11 +525,8 @@ class SDCWTVerifier:
 
             return True, clean_claims, tags_absent
 
-        except Exception as e:
-            import traceback
-
-            print(f"Verification error: {e}")  # For debugging
-            traceback.print_exc()
+        except Exception:
+            # Reject without logging token contents, decrypted claims, or resolver data.
             return False, None, False
 
     def _extract_clean_claims(self, payload: dict[int, Any]) -> tuple[dict[str, Any], bool]:
@@ -556,54 +583,20 @@ class SDCWTVerifier:
         Returns:
             Tuple of (clean_claims, tags_absent)
         """
-        # First, extract the base claims from payload (same as before)
-        base_claims, _ = self._extract_clean_claims(payload)
-        clean_claims: dict[Any, Any] = dict(base_claims)
-
-        # Extract disclosed claims from SD-CWT unprotected header
-        try:
-            cose_sign1 = cbor_utils.decode(sd_cwt_with_disclosures)
-            if cbor_utils.is_tag(cose_sign1):
-                cose_sign1_value = cbor_utils.get_tag_value(cose_sign1)
-            else:
-                cose_sign1_value = cose_sign1
-
-            if isinstance(cose_sign1_value, list) and len(cose_sign1_value) >= 2:
-                unprotected_header = cose_sign1_value[1]
-                if isinstance(unprotected_header, dict):
-                    # Extract sd_claims (key 17 based on spec examples)
-                    sd_claims = unprotected_header.get(17, [])
-
-                    # Process each disclosure and add to clean_claims
-                    for disclosure_bytes in sd_claims:
-                        if isinstance(disclosure_bytes, bytes):
-                            disclosure = cbor_utils.decode(disclosure_bytes)
-                            if isinstance(disclosure, list) and len(disclosure) == 3:
-                                # SD-CWT format: [salt, value, key]
-                                salt, value, key = disclosure
-
-                                # Add disclosed claim to clean_claims
-                                if isinstance(key, str):
-                                    clean_claims[key] = value
-                                elif isinstance(key, int):
-                                    # Handle numeric keys by converting to standard claim names
-                                    if key == 1:
-                                        clean_claims["iss"] = value
-                                    elif key == 2:
-                                        clean_claims["sub"] = value
-                                    elif key == 6:
-                                        clean_claims["iat"] = value
-                                    else:
-                                        clean_claims[key] = value
-
-        except Exception:
-            # If disclosure processing fails, just return the base claims
-            pass
-
-        # All disclosed claims should have tags absent since they're explicitly disclosed
-        tags_absent = True
-
-        return clean_claims, tags_absent
+        cose = cbor_utils.get_tag_value(cbor_utils.decode(sd_cwt_with_disclosures))
+        reconstructed = reconstruct_claims(payload, cose[1].get(17, []))
+        # Preserve this API's standard-claim aliases and omission of cnf, but
+        # retain all application labels and their original nesting.
+        aliases = {1: "iss", 2: "sub", 6: "iat"}
+        clean = {}
+        for key, value in reconstructed.items():
+            if key == 8:
+                continue
+            name = aliases.get(key, key)
+            if name in clean:
+                raise ValueError("claim alias collides with a registered claim")
+            clean[name] = value
+        return clean, True
 
     def _clean_value_recursive(self, value: Any) -> tuple[Any, bool]:
         """Recursively clean a value and check for redaction tags.

@@ -415,3 +415,80 @@ def edn_to_redacted_cbor(
     cbor_claims = cbor_utils.encode(sd_cwt_claims)
 
     return cbor_claims, disclosures
+
+
+def reconstruct_claims(payload: dict[Any, Any], disclosures: list[bytes]) -> dict[Any, Any]:
+    """Apply each disclosure at its hash location, preserving maps and arrays.
+
+    Undisclosed map entries and array elements are removed. A disclosure can
+    introduce further hash locations, so input order does not matter. Reject
+    duplicate consumption, duplicate map keys, and unreachable disclosures.
+    """
+    lookup = {}
+    for raw in disclosures:
+        disclosure = cbor_utils.decode(raw)
+        if (
+            not isinstance(disclosure, list)
+            or len(disclosure) not in (1, 2, 3)
+            or not isinstance(disclosure[0], bytes)
+        ):
+            raise ValueError("invalid salted disclosure")
+        digest = hash_disclosure(raw)
+        if digest in lookup:
+            raise ValueError("duplicate disclosure")
+        lookup[digest] = disclosure
+    used: set[bytes] = set()
+    redacted_key = cbor_utils.create_simple_value(59)
+    omitted = object()
+
+    def take(digest: bytes, length: int):
+        if not isinstance(digest, bytes):
+            raise ValueError("redacted claim hash must be a byte string")
+        if digest not in lookup:
+            return None
+        if digest in used:
+            raise ValueError("disclosure used more than once")
+        disclosure = lookup[digest]
+        if len(disclosure) != length and len(disclosure) != 1:
+            raise ValueError("map/array disclosure shape mismatch")
+        used.add(digest)
+        return disclosure if len(disclosure) != 1 else None
+
+    def walk(node: Any, depth: int = 0, array_element: bool = False):
+        if depth > 16:
+            raise ValueError("nested disclosures exceed maximum depth of 16")
+        if isinstance(node, dict):
+            result = {key: walk(value, depth) for key, value in node.items() if key != redacted_key}
+            hashes = node.get(redacted_key, [])
+            if not isinstance(hashes, list):
+                raise ValueError("redacted map hashes must be an array")
+            for digest in hashes:
+                disclosure = take(digest, 3)
+                if disclosure is not None:
+                    _, value, key = disclosure
+                    if key == redacted_key or key in result:
+                        raise ValueError("duplicate disclosed map key")
+                    result[key] = walk(value, depth + 1)
+            return result
+        if isinstance(node, list):
+            result = []
+            for value in node:
+                reconstructed = walk(value, depth, array_element=True)
+                if reconstructed is not omitted:
+                    result.append(reconstructed)
+            return result
+        if cbor_utils.is_tag(node):
+            number = cbor_utils.get_tag_number(node)
+            value = cbor_utils.get_tag_value(node)
+            if number == 60:
+                if not array_element:
+                    raise ValueError("redacted array element outside an array")
+                disclosure = take(value, 2)
+                return walk(disclosure[1], depth + 1) if disclosure is not None else omitted
+            return cbor_utils.create_tag(number, walk(value, depth))
+        return node
+
+    result = walk(payload)
+    if used != lookup.keys():
+        raise ValueError("disclosures match no Redacted Claim Hash")
+    return result
