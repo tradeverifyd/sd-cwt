@@ -1,0 +1,21 @@
+{
+  "spec": "draft-ietf-spice-sd-cwt-09",
+  "revision": "79c43819c74c3240b3eab8601996d2b694e30087",
+  "canonical_fixture_sha256": {
+    "issuer_cwt.cbor": "1d7a2d3fbcc41042cfce7c14c6d8cfb1aca8cbc723d4dc17104774e4ac0aa229",
+    "kbt.cbor": "14fbbfce745203e4b0ddf42fa5b567bce04e2ba82eb9396d56b65c89a4dbde2c",
+    "decoy.cbor": "c04f2e1480f891641008e40c39b2838f24a702619741fdcc63509015729779e3",
+    "nested_issuer_cwt.cbor": "0a83400b0cfd677ec0cdd1800718cfafaa24a44dac7a8e0d7a151e85a19e9780",
+    "nested_cwt.cbor": "abf63861aae3e59631913b6199d6c8379cb7807c05d97f3b68f0fa6c4fe60859",
+    "nested_kbt.cbor": "1c5cbab6839c3d9114193aefc0addd86d11a13ebceb8a17a31afce4ed3290ecc"
+  },
+  "rust_fixture": {
+    "file": "aes256_aead.rust.cbor",
+    "revision": "c6eb0e426ac3e8ecdbcadf70f2a9d44af05a748f",
+    "adapter": "interop/implementations/esdicawt_aead/cli.patch",
+    "sha256": "d00f940a79df8a378d2b59c6d34a9d081aa7fe074b69dbfd45814078b8f82867",
+    "aead_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "time": 1725244300,
+    "note": "native Rust Holder; library unchanged; test keys only"
+  }
+}

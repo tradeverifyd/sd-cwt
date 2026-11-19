@@ -209,7 +209,8 @@ class SDCWTIssuer:
             subject: Subject identifier
             use_holder_thumbprint: Whether to use thumbprint in cnf claim
             sd_aead: Optional IANA AEAD algorithm id for encrypted disclosures,
-                carried as sd_aead (172). Holders default to AEAD_AES_128_GCM.
+                carried in the unprotected header as a Holder hint. Holders may override
+                it with aead_algorithm; it is not an Issuer-authenticated restriction.
 
         Returns:
             Tuple of (sd_cwt_bytes, disclosure_edn_string, disclosures)
@@ -245,10 +246,12 @@ class SDCWTIssuer:
             16: 293,  # typ: CoAP content-format for application/sd-cwt
             4: issuer_thumbprint,  # kid
         }
-        if sd_aead is not None:
-            protected_header[SD_AEAD] = sd_aead
-
-        sd_cwt = cose_sign1_sign(payload_cbor, self.signer, protected_header=protected_header)
+        sd_cwt = cose_sign1_sign(
+            payload_cbor,
+            self.signer,
+            protected_header=protected_header,
+            unprotected_header={SD_AEAD: sd_aead} if sd_aead is not None else {},
+        )
 
         return sd_cwt, edn_string, disclosures
 
@@ -323,6 +326,7 @@ class SDCWTPresenter:
         aead_key: Optional[bytes] = None,
         aead_key_context: Optional[KeyContext] = None,
         issued_at: Optional[int] = None,
+        aead_algorithm: Optional[int] = None,
     ) -> bytes:
         """Create a presentation with selected claims disclosed.
 
@@ -340,6 +344,7 @@ class SDCWTPresenter:
             aead_key: Symmetric key shared with the Verifier that will decrypt
                 encrypted_disclosures. Required when they are given.
             aead_key_context: Optional key context added to each encrypted entry
+            aead_algorithm: Holder-selected AEAD id, written in unprotected header 172.
             issued_at: Explicit KBT issuance time for controlled clocks/test vectors.
                 Defaults to the current time; cannot extend the credential validity.
 
@@ -366,6 +371,7 @@ class SDCWTPresenter:
             to_encrypt,
             key=aead_key or b"",
             key_context=aead_key_context,
+            algorithm=aead_algorithm,
         )
 
         # Create the KBT
@@ -416,12 +422,14 @@ class SDCWTVerifier:
         now: Optional[float] = None,
         leeway: float = 0,
         expected_nonce: Optional[bytes] = None,
+        aead_entry_key_resolver: Optional[Callable[[list[Any], int], Any]] = None,
     ) -> tuple[bool, Optional[dict[Any, Any]], bool]:
         """Verify an SD-CWT presentation and extract claims.
 
         Args:
             kbt: Key Binding Token containing the presentation
             expected_audience: Expected audience value
+            aead_entry_key_resolver: Optional (entry, algorithm) callback for nonce/tag lookup.
             now: Verification time in epoch seconds; defaults to the system clock.
                 Set explicitly only for a trusted clock or historical fixtures.
             leeway: Nonnegative finite clock skew in seconds (default zero).
@@ -494,7 +502,9 @@ class SDCWTVerifier:
             # Encrypted disclosures this Verifier can open are processed as if
             # they had been in sd_claims.
             sd_cwt_with_disclosures, _undecrypted = decrypt_sd_cwt_disclosures(
-                sd_cwt_with_disclosures, aead_key_resolver
+                sd_cwt_with_disclosures,
+                aead_key_resolver,
+                entry_key_resolver=aead_entry_key_resolver,
             )
 
             # Policy must inspect reconstructed claims: aud/exp may be disclosed.

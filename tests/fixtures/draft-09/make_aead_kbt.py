@@ -5,7 +5,7 @@ draft's AEAD key and nonce, so its sd_aead_encrypted_claims entry is
 byte-identical to the draft's aead-claim-array.edn example. Two more are
 disclosed in plaintext, as in kbt.cbor.
 
-    .venv/bin/python tests/fixtures/draft-08/make_aead_kbt.py
+    .venv/bin/python tests/fixtures/draft-09/make_aead_kbt.py
 """
 
 import sys

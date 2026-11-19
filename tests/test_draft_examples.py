@@ -1,11 +1,11 @@
-"""Conformance tests against the canonical examples in draft-ietf-spice-sd-cwt-08.
+"""Conformance tests against the canonical examples in draft-ietf-spice-sd-cwt-09.
 
 Every other test in this suite signs and verifies with this library on both
 sides, so it passes whenever the library is self-consistent -- including when it
 is self-consistently wrong. These tests are the opposite: the bytes are fixed by
 the draft, and the library has to meet them.
 
-Fixtures and key provenance: tests/fixtures/draft-08/README.md
+Fixtures and key provenance: tests/fixtures/draft-09/README.md
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ from sd_cwt.holder_binding import kcwt_to_bytes
 from sd_cwt.redaction import hash_disclosure
 from sd_cwt.verifiers import CredentialVerifier, get_presentation_verifier
 
-FIXTURES = Path(__file__).parent / "fixtures" / "draft-08"
+FIXTURES = Path(__file__).parent / "fixtures" / "draft-09"
 
 # Appendix C.2: Issuer key, P-384 / ES384.
 ISSUER_PUBLIC_KEY = {
