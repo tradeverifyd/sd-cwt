@@ -1,9 +1,9 @@
-"""AEAD encrypted disclosures (draft-ietf-spice-sd-cwt-08, Section "Encrypted Disclosures").
+"""AEAD encrypted disclosures (draft-ietf-spice-sd-cwt-09, Section "Encrypted Disclosures").
 
 A Holder MAY move some of the Salted Disclosed Claims it presents out of
 ``sd_claims`` (17) and into ``sd_aead_encrypted_claims`` (171), encrypted to an
 inner Verifier with a symmetric key agreed out of band. The AEAD algorithm is
-taken from ``sd_aead`` (172) in the SD-CWT protected header, defaulting to
+taken from ``sd_aead`` (172) in the SD-CWT unprotected header, defaulting to
 AEAD_AES_128_GCM.
 
 The plaintext is the full CBOR encoding of ``bstr .cbor salted-entry`` -- the
@@ -30,6 +30,7 @@ AEAD_AES_256_GCM = 2
 AEAD_CHACHA20_POLY1305 = 29
 
 DEFAULT_AEAD = AEAD_AES_128_GCM
+FORBIDDEN_AEAD = set(range(3, 15)) | {18, 19, 21, 22, 24, 25, 27, 28}
 
 TAG_LENGTH = 16
 
@@ -49,7 +50,7 @@ class AeadDisclosureError(ValueError):
 
 
 def _algorithm(alg: int) -> tuple[int, int, Any]:
-    if isinstance(alg, bool) or alg not in _ALGORITHMS:
+    if type(alg) is not int or alg not in _ALGORITHMS:
         raise AeadDisclosureError(f"unsupported AEAD algorithm: {alg!r}")
     return _ALGORITHMS[alg]
 
@@ -104,16 +105,20 @@ def encrypt_disclosure(
 
 
 def _check_entry(entry: Any, alg: int) -> None:
-    _key_length, nonce_length, _impl = _algorithm(alg)
+    params = _ALGORITHMS.get(alg)
     if not isinstance(entry, list) or len(entry) not in (3, 4):
         raise AeadDisclosureError("aead-encrypted must be [nonce, ciphertext, tag, ?key-context]")
     nonce, ciphertext, tag = entry[:3]
     if not all(isinstance(part, bytes) for part in (nonce, ciphertext, tag)):
         raise AeadDisclosureError("nonce, ciphertext and tag must be byte strings")
-    if len(nonce) != nonce_length:
-        raise AeadDisclosureError(f"nonce must be {nonce_length} bytes")
-    if len(tag) != TAG_LENGTH:
-        raise AeadDisclosureError(f"tag must be {TAG_LENGTH} bytes")
+    if params is not None and len(nonce) != params[1]:
+        raise AeadDisclosureError(f"nonce must be {params[1]} bytes")
+    if (params is not None and len(tag) != TAG_LENGTH) or len(tag) < TAG_LENGTH:
+        raise AeadDisclosureError(
+            "tag must be at least 16 bytes (exactly 16 for supported algorithms)"
+        )
+    if alg in (34, 35, 36, 37) and len(tag) != 32:
+        raise AeadDisclosureError("AEGIS X algorithms require 32-byte tags")
     if len(entry) == 4:
         _check_key_context(entry[3])
 
@@ -169,9 +174,14 @@ def sd_aead_algorithm(sd_cwt: bytes) -> int:
     """Return the AEAD algorithm for an SD-CWT: ``sd_aead`` (172) or the default."""
     _decoded, value = _split_cose_sign1(sd_cwt)
     protected = cbor_utils.decode(value[0]) if value[0] else {}
-    alg = protected.get(SD_AEAD, DEFAULT_AEAD)
-    _algorithm(alg)
-    return int(alg)
+    if SD_AEAD in protected:
+        raise AeadDisclosureError("draft-09 sd_aead must be in unprotected headers")
+    alg = value[1].get(SD_AEAD, DEFAULT_AEAD)
+    if type(alg) is not int or not 0 <= alg <= 65535:
+        raise AeadDisclosureError("sd_aead must be a uint of at most two bytes")
+    if alg in FORBIDDEN_AEAD:
+        raise AeadDisclosureError("AEAD algorithm forbidden by draft-09 section 16.9")
+    return alg
 
 
 def encrypt_sd_cwt_disclosures(
@@ -181,6 +191,8 @@ def encrypt_sd_cwt_disclosures(
     key: bytes,
     key_context: Optional[KeyContext] = None,
     nonces: Optional[list[bytes]] = None,
+    *,
+    algorithm: Optional[int] = None,
 ) -> bytes:
     """Place disclosures in an SD-CWT, encrypting some of them (Holder side).
 
@@ -191,6 +203,7 @@ def encrypt_sd_cwt_disclosures(
         key: Symmetric AEAD key shared with the inner Verifier
         key_context: Optional context added to each encrypted entry
         nonces: Optional fixed nonces, one per element of ``to_encrypt``; test vectors only
+        algorithm: Holder-selected AEAD id; otherwise use the unprotected hint or default.
 
     Returns:
         The SD-CWT with both header parameters set. Either is omitted when it
@@ -199,7 +212,10 @@ def encrypt_sd_cwt_disclosures(
     if nonces is not None and len(nonces) != len(to_encrypt):
         raise ValueError("nonces must have one entry per disclosure to encrypt")
 
-    alg = sd_aead_algorithm(sd_cwt)
+    existing_algorithm = sd_aead_algorithm(sd_cwt)
+    alg = existing_algorithm if algorithm is None else algorithm
+    if to_encrypt:
+        _algorithm(alg)
     decoded, value = _split_cose_sign1(sd_cwt)
     unprotected = dict(value[1])
     unprotected.pop(SD_CLAIMS, None)
@@ -208,6 +224,7 @@ def encrypt_sd_cwt_disclosures(
     if disclosures:
         unprotected[SD_CLAIMS] = list(disclosures)
     if to_encrypt:
+        unprotected[SD_AEAD] = alg
         unprotected[SD_AEAD_ENCRYPTED_CLAIMS] = [
             encrypt_disclosure(
                 disclosure,
@@ -232,7 +249,12 @@ def _candidate_keys(resolved: Union[None, bytes, Iterable[bytes]]) -> list[bytes
 
 
 def decrypt_sd_cwt_disclosures(
-    sd_cwt: bytes, key_resolver: Optional[AeadKeyResolver]
+    sd_cwt: bytes,
+    key_resolver: Optional[AeadKeyResolver],
+    *,
+    entry_key_resolver: Optional[
+        Callable[[list[Any], int], Union[None, bytes, Iterable[bytes]]]
+    ] = None,
 ) -> tuple[bytes, list[list[Any]]]:
     """Decrypt ``sd_aead_encrypted_claims`` into ``sd_claims`` (Verifier side).
 
@@ -245,6 +267,7 @@ def decrypt_sd_cwt_disclosures(
     Args:
         sd_cwt: SD-CWT, possibly carrying ``sd_aead_encrypted_claims``
         key_resolver: Maps a key context to candidate keys
+        entry_key_resolver: Optional (entry, algorithm) callback, overriding context lookup.
 
     Returns:
         Tuple of (SD-CWT with decrypted disclosures appended to ``sd_claims``,
@@ -256,6 +279,7 @@ def decrypt_sd_cwt_disclosures(
     """
     decoded, value = _split_cose_sign1(sd_cwt)
     unprotected = dict(value[1])
+    alg = sd_aead_algorithm(sd_cwt)
     if SD_CLAIMS in unprotected and unprotected[SD_CLAIMS] == []:
         raise AeadDisclosureError("sd_claims MUST NOT be an empty array")
     if SD_AEAD_ENCRYPTED_CLAIMS not in unprotected:
@@ -270,8 +294,14 @@ def decrypt_sd_cwt_disclosures(
     remaining: list[list[Any]] = []
     for entry in entries:
         _check_entry(entry, alg)
+        if alg not in _ALGORITHMS:
+            remaining.append(entry)
+            continue  # draft-09 section 9: unsupported algorithms remain opaque
         key_context = entry[3] if len(entry) == 4 else None
-        keys = _candidate_keys(key_resolver(key_context)) if key_resolver else []
+        if entry_key_resolver is not None:
+            keys = _candidate_keys(entry_key_resolver(entry, alg))
+        else:
+            keys = _candidate_keys(key_resolver(key_context)) if key_resolver else []
         if not keys:
             remaining.append(entry)
             continue

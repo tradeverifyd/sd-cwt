@@ -2,7 +2,9 @@
 
 Copied verbatim from `examples/` in
 [ietf-wg-spice/draft-ietf-spice-sd-cwt](https://github.com/ietf-wg-spice/draft-ietf-spice-sd-cwt)
-at `draft-ietf-spice-sd-cwt-08`.
+at `draft-ietf-spice-sd-cwt-09` (`79c4381`). The six canonical binary
+fixtures are byte-identical to their -08 copies; their hashes were checked
+against the -09 tag. See `draft-09-provenance.json`.
 
 | File | What it is |
 |---|---|
@@ -38,3 +40,7 @@ test keys, published in the Internet-Draft itself. They are public sample keys
 with no value, checked in so the tests can sign as well as verify.
 
 Never use them for anything real.
+
+`aes256_aead.rust.cbor` is native output of Beltram’s unchanged `c6eb0e4`
+library through the recorded CLI adapter, using public test keys, unprotected
+algorithm 172=2, and epoch 1725244300. Its symmetric test key is bytes 0..31.

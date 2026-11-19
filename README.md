@@ -1,5 +1,9 @@
 # SD-CWT: Selective Disclosure CBOR Web Token
 
+Targets [draft-ietf-spice-sd-cwt-09](https://datatracker.ietf.org/doc/draft-ietf-spice-sd-cwt/09/).
+See [draft -09 migration, tests, and scope](DRAFT-09.md) and `SPEC-VERSION.json`.
+
+
 [![Test](https://github.com/tradeverifyd/sd-cwt/actions/workflows/test.yml/badge.svg)](https://github.com/tradeverifyd/sd-cwt/actions/workflows/test.yml)
 
 This is an experimental implementation of [draft-ietf-spice-sd-cwt](https://github.com/ietf-wg-spice/draft-ietf-spice-sd-cwt).

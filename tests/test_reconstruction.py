@@ -38,7 +38,7 @@ def test_no_flattening_and_no_redaction_metadata_in_draft():
     from pathlib import Path
 
     token = cbor.get_tag_value(
-        cbor.decode((Path(__file__).parent / "fixtures/draft-08/issuer_cwt.cbor").read_bytes())
+        cbor.decode((Path(__file__).parent / "fixtures/draft-09/issuer_cwt.cbor").read_bytes())
     )
     claims = reconstruct_claims(cbor.decode(token[2]), token[1][17])
     assert claims[500] is True

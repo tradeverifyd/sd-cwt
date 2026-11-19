@@ -1,4 +1,4 @@
-"""AEAD encrypted disclosures, draft-ietf-spice-sd-cwt-08 Section "Encrypted Disclosures"."""
+"""AEAD encrypted disclosures, draft-ietf-spice-sd-cwt-09 Section "Encrypted Disclosures"."""
 
 import pytest
 
@@ -182,7 +182,7 @@ class TestHeaders:
         assert seen == ["rp-1"] and remaining == []
         assert cbor_utils.get_tag_value(cbor_utils.decode(out))[1][17] == [disclosures[501]]
 
-    def test_uses_sd_aead_from_the_protected_header(self, holder_key, disclosures) -> None:
+    def test_uses_sd_aead_from_the_unprotected_header(self, holder_key, disclosures) -> None:
         from sd_cwt.simple_api import SDCWTIssuer
 
         issuer_key = _cose_private_key(FIXTURES / "issuer_privkey.pem", 2)
@@ -386,3 +386,99 @@ def test_no_encrypted_header_passthrough(issued):
 def test_fixed_nonce_count_must_match(issued):
     with pytest.raises(ValueError, match="one entry"):
         encrypt_sd_cwt_disclosures(issued, [], [FIRST_DISCLOSURE], DRAFT_KEY, nonces=[])
+
+
+class TestDraft09:
+    @pytest.mark.parametrize("algorithm,key_length", [(1, 16), (2, 32), (29, 32)])
+    def test_holder_selects_algorithm_without_changing_issuer_signature(
+        self, issued, holder_key, disclosures, algorithm, key_length
+    ):
+        key = bytes(range(key_length))
+        presentation = SDCWTPresenter(holder_key).create_presentation(
+            issued,
+            list(disclosures.values()),
+            [],
+            AUDIENCE,
+            encrypted_disclosures=[disclosures[501]],
+            aead_key=key,
+            aead_algorithm=algorithm,
+            issued_at=issuance_time(issued),
+        )
+        outer = cbor_utils.get_tag_value(cbor_utils.decode(presentation))
+        inner = cbor_utils.get_tag_value(
+            cbor_utils.decode(cbor_utils.encode(cbor_utils.decode(outer[0])[13]))
+        )
+        original = cbor_utils.get_tag_value(cbor_utils.decode(issued))
+        assert 172 not in cbor_utils.decode(inner[0])
+        assert inner[1][172] == algorithm
+        assert [inner[i] for i in (0, 2, 3)] == [original[i] for i in (0, 2, 3)]
+        valid, claims, _ = verify_fixture(presentation, AUDIENCE, aead_key_resolver=lambda _: key)
+        assert valid and claims[501] == "ABCD-123456"
+
+    @pytest.mark.parametrize("algorithm", [-1, 65536, True, 1.5, "2", 3, 14, 28])
+    def test_rejects_invalid_algorithm_id(self, issued, algorithm):
+        from sd_cwt.aead import sd_aead_algorithm
+
+        value = cbor_utils.decode(issued)
+        value.value[1][172] = algorithm
+        with pytest.raises(AeadDisclosureError):
+            sd_aead_algorithm(cbor_utils.encode(value))
+
+    def test_unsupported_algorithm_stays_opaque_and_resolver_is_not_called(self, issued):
+        value = cbor_utils.decode(issued)
+        value.value[1] = {172: 15, 171: [DRAFT_ENTRY]}
+        opaque = cbor_utils.encode(value)
+
+        def unexpected(_):
+            pytest.fail("unsupported algorithm must not invoke key resolution")
+
+        returned, remaining = decrypt_sd_cwt_disclosures(opaque, unexpected)
+        assert returned == opaque and remaining == [DRAFT_ENTRY]
+
+    def test_old_protected_algorithm_is_not_a_fallback(self, issued):
+        value = cbor_utils.decode(issued)
+        protected = cbor_utils.decode(value.value[0])
+        protected[172] = 2
+        value.value[0] = cbor_utils.encode(protected)
+        with pytest.raises(AeadDisclosureError, match="unprotected"):
+            decrypt_sd_cwt_disclosures(cbor_utils.encode(value), None)
+
+    def test_resolver_can_select_by_nonce(self, issued, holder_key, disclosures):
+        presentation = SDCWTPresenter(holder_key).create_presentation(
+            issued,
+            list(disclosures.values()),
+            [],
+            AUDIENCE,
+            encrypted_disclosures=[disclosures[501]],
+            aead_key=DRAFT_KEY,
+            issued_at=issuance_time(issued),
+        )
+        nonce = _embedded_unprotected(presentation)[171][0][0]
+
+        def resolver(entry, algorithm):
+            assert algorithm == 1
+            return {nonce: DRAFT_KEY}.get(entry[0])
+
+        valid, claims, _ = verify_fixture(presentation, AUDIENCE, aead_entry_key_resolver=resolver)
+        assert valid and claims[501] == "ABCD-123456"
+
+
+@pytest.mark.parametrize("with_key", [False, True])
+def test_native_rust_draft09_aes256_fixture(with_key):
+    token = (FIXTURES / "aes256_aead.rust.cbor").read_bytes()
+    valid, claims, clean = verify_fixture(
+        token, AUDIENCE, aead_key_resolver=(lambda _: bytes(range(32))) if with_key else None
+    )
+    assert valid and clean
+    assert (501 in claims) == with_key
+    assert ("region" in claims[503]) == with_key
+    assert claims[502] == ([1549560720, 1612560720, 1674004740] if with_key else [1674004740])
+
+
+def test_draft09_published_first_disclosure_digest():
+    from sd_cwt.redaction import hash_disclosure
+
+    # Published -09 examples/first-blinded-hash.txt (corrected from -08).
+    assert hash_disclosure(FIRST_DISCLOSURE).hex() == (
+        "af375dc3fba1d082448642c00be7b2f7bb05c9d8fb61cfc230ddfdfb4616a693"
+    )

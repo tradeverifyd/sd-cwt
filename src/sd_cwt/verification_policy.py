@@ -1,4 +1,4 @@
-"""Checks on authenticated, reconstructed CWT claims (RFC 8392 and draft-08)."""
+"""Checks on authenticated, reconstructed CWT claims (RFC 8392 and draft-09)."""
 
 import math
 import re
